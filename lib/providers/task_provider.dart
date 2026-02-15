@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/task.dart';
+import '../models/domain.dart';
 import '../services/task_service.dart';
 import 'domain_provider.dart';
+import 'daily_log_provider.dart';
 
 /// State class for Task management
 /// Holds all tasks and provides filtering methods
@@ -123,4 +125,62 @@ final todayTasksProvider = Provider<List<Task>>((ref) {
   });
   
   return todayTasks;
+});
+
+/// Provider for computing today's progress per domain
+/// Returns a Map<Domain, double> where double is completion percentage (0.0 to 1.0)
+/// 
+/// How it works:
+/// 1. Gets all active domains
+/// 2. For each domain, gets today's tasks for that domain
+/// 3. Counts total tasks and completed tasks (from DailyLog)
+/// 4. Computes progress = completed / total (or 0 if no tasks)
+/// 
+/// UI updates automatically when:
+/// - User completes/uncompletes a task -> dailyLogProvider changes
+/// - User adds/removes tasks -> taskProvider changes
+/// - Domain is activated/deactivated -> domainProvider changes
+final todayProgressProvider = Provider<Map<Domain, double>>((ref) {
+  final domainState = ref.watch(domainProvider);
+  final taskState = ref.watch(taskProvider);
+  final logState = ref.watch(dailyLogProvider);
+  
+  final progressMap = <Domain, double>{};
+  
+  // Debug print
+  print('=== TODAY PROGRESS CALCULATION ===');
+  print('Active domains count: ${domainState.activeDomains.length}');
+  
+  // Calculate progress for each active domain
+  for (final domain in domainState.activeDomains) {
+    // Get all tasks for this domain that should appear today
+    final domainTasks = taskState.tasks.where((task) => 
+      task.domainId == domain.id
+    ).toList();
+    
+    print('Domain: ${domain.name}, Total tasks: ${domainTasks.length}');
+    
+    // If no tasks, progress is 0
+    if (domainTasks.isEmpty) {
+      progressMap[domain] = 0.0;
+      print('  -> Progress: 0.0 (no tasks)');
+      continue;
+    }
+    
+    // Count how many tasks are completed today
+    final completedCount = domainTasks.where((task) =>
+      logState.isTaskCompletedToday(task.id)
+    ).length;
+    
+    print('  -> Completed: $completedCount / ${domainTasks.length}');
+    
+    // Calculate progress as percentage (0.0 to 1.0)
+    final progress = completedCount / domainTasks.length;
+    progressMap[domain] = progress;
+    print('  -> Progress: $progress');
+  }
+  
+  print('=== END PROGRESS CALCULATION ===\n');
+  
+  return progressMap;
 });
