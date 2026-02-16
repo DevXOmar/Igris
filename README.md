@@ -1,205 +1,194 @@
-# Igris - Personal Productivity & Identity Tracking App
+# IGRIS
 
-A Flutter mobile app for tracking personal productivity across different life domains with a weekly grace system.
-
-## 🚀 Features
-
-- **Domain Management**: Create and manage life domains (Health, Work, Learning, etc.)
-- **Task Tracking**: Add recurring and one-time tasks to each domain
-- **Daily Progress**: Track daily task completion with an intuitive interface
-- **Domain Strength**: Domain strength increases as you complete tasks
-- **Grace System**: 2 weekly grace tokens to prevent streak breaks
-- **Calendar View**: Visual monthly calendar showing task completion history
-- **Dark Theme**: Modern minimal dark design
-
-## 🏗️ Architecture
-
-The app follows a clean architecture with separation of concerns:
-
-```
-lib/
-├── core/
-│   ├── theme/          # App theme configuration
-│   └── utils/          # Utility functions (date helpers)
-├── models/             # Data models with Hive adapters
-│   ├── domain.dart
-│   ├── task.dart
-│   └── daily_log.dart
-├── services/           # Business logic and Hive operations
-│   ├── domain_service.dart
-│   ├── task_service.dart
-│   ├── daily_log_service.dart
-│   └── settings_service.dart
-├── providers/          # Riverpod state management
-│   ├── domain_provider.dart
-│   ├── task_provider.dart
-│   ├── daily_log_provider.dart
-│   ├── grace_provider.dart
-│   └── navigation_provider.dart
-├── screens/            # UI screens
-│   ├── home/
-│   ├── calendar/
-│   ├── domains/
-│   └── settings/
-├── widgets/            # Reusable widgets
-│   ├── task_item.dart
-│   └── grace_tokens_display.dart
-└── main.dart           # App entry point
-```
-
-## 📦 Tech Stack
-
-- **Flutter** (latest stable)
-- **Dart** 
-- **Hive** for local storage
-- **Riverpod** for state management
-- **table_calendar** for calendar view
-- **uuid** for generating unique IDs
-
-## 🔧 Setup Instructions
-
-### Prerequisites
-
-- Flutter SDK (latest stable version)
-- Dart SDK
-- iOS Simulator (for macOS) or Android Emulator
-
-### Installation Steps
-
-1. **Install Dependencies**
-   ```bash
-   flutter pub get
-   ```
-
-2. **Generate Hive Adapters**
-   
-   The app uses Hive for local storage with type adapters. Generate them with:
-   ```bash
-   flutter pub run build_runner build --delete-conflicting-outputs
-   ```
-   
-   This will generate:
-   - `lib/models/domain.g.dart`
-   - `lib/models/task.g.dart`
-   - `lib/models/daily_log.g.dart`
-
-3. **Run the App**
-   ```bash
-   flutter run
-   ```
-
-## 🎯 How It Works
-
-### State Management with Riverpod
-
-The app uses Riverpod 2.x with `NotifierProvider` for clean, reactive state management:
-
-- **DomainProvider**: Manages life domains (add, update, toggle active, adjust strength)
-- **TaskProvider**: Manages tasks (add, update, delete, filter by domain)
-- **DailyLogProvider**: Tracks daily task completion and updates domain strength
-- **GraceProvider**: Manages weekly grace tokens with auto-reset
-- **NavigationProvider**: Handles bottom navigation state
-
-### Data Flow
-
-```
-UI (ConsumerWidget)
-  ↓
-ref.watch(provider) / ref.read(provider.notifier)
-  ↓
-Notifier methods
-  ↓
-Service layer
-  ↓
-Hive (local storage)
-  ↓
-State updated → UI rebuilds
-```
-
-### Grace System
-
-- **2 grace tokens per week**
-- Automatically resets every 7 days
-- Stored in `settingsBox` with `lastResetDate`
-- Use grace to skip a day without breaking streak
-- Grace usage stored in `DailyLog` model
-
-### Today's Tasks Logic
-
-The `todayTasksProvider` automatically:
-- Includes all recurring tasks (appear every day)
-- Includes all one-time tasks (V1 shows all; V2 will add date filtering)
-- Filters tasks from inactive domains
-- Sorts: recurring first, then alphabetically
-
-### Domain Strength
-
-- Increments when task is marked complete
-- Decrements when completion is removed (never goes below 0)
-- Provides visual feedback on progress in each domain
-
-## 📱 Screens
-
-1. **Home Screen**: Today's date, task list, grace tokens display
-2. **Calendar Screen**: Monthly calendar with completion indicators
-3. **Domains Screen**: Manage domains and their tasks
-4. **Settings Screen**: Grace system info, statistics, domain strengths
-
-## 🗂️ Data Models
-
-### Domain
-- `id`: String (UUID)
-- `name`: String
-- `strength`: int (increments with task completion)
-- `isActive`: bool (active domains show in today's tasks)
-
-### Task
-- `id`: String (UUID)
-- `domainId`: String
-- `title`: String
-- `isRecurring`: bool (recurring tasks appear daily)
-
-### DailyLog
-- `date`: DateTime (normalized to midnight)
-- `completedTaskIds`: List<String>
-- `graceUsed`: bool
-
-## 🔄 Weekly Reset
-
-The grace system automatically resets weekly:
-
-1. On app start, `GraceProvider` checks `lastResetDate`
-2. If 7+ days have passed, triggers reset:
-   - `weeklyGraceLeft` = 2
-   - `lastResetDate` = now
-3. Persists to `settingsBox` in Hive
-
-## 🎨 Theme
-
-Dark theme only with:
-- Primary color: Purple (#6C63FF)
-- Secondary color: Green (#4CAF50)
-- Background: Dark (#121212)
-- Material 3 design system
-
-## 📝 Future Enhancements (V2+)
-
-- Date-specific one-time tasks
-- Streak tracking and visualization
-- Task completion history per domain
-- Export data
-- Cloud backup
-- Notifications and reminders
-- Task notes and attachments
-
-## 🤝 Contributing
-
-This is a personal project, but suggestions and improvements are welcome!
-
-## 📄 License
-
-See LICENSE file for details.
+> Not a productivity app.  
+> A mirror.  
+> A blade.  
+> A witness.
 
 ---
 
-**Igris** - Track your progress, build your identity.
+## What Is Igris?
+
+Igris is not built to help me “get things done.”
+
+It exists to make sure I do not forget who I am becoming.
+
+Every domain inside this system is not a category.
+It is a fragment of identity.
+
+Each one is a pillar.
+
+And every week is a campaign.
+
+---
+
+## Philosophy
+
+Perfection is cheap when it resets daily.
+
+Igris does not reward daily spikes.
+It rewards sustained pressure.
+
+You do not reach 100% in a day.
+
+You climb toward it.
+Task by task.
+Hour by hour.
+Across the week.
+
+If everything scheduled is completed —
+only then does the bar reach 100.
+
+Not because you tapped a checkbox.
+
+But because you endured.
+
+---
+
+## The System
+
+Each domain has:
+
+- A weekly campaign.
+- A cumulative score from 0 → 100.
+- A quiet streak that survives only through consistency.
+
+Daily effort feeds weekly strength.
+
+Weekly strength defines momentum.
+
+Momentum defines identity.
+
+---
+
+## Grace
+
+There are 2 grace tokens per week.
+
+Not excuses.
+
+Not laziness passes.
+
+Strategic resets.
+
+Grace does not inflate score.
+It removes unfair penalty.
+
+Because discipline is not self-destruction.
+It is controlled intensity.
+
+---
+
+## The Bars
+
+The home screen does not show tasks.
+
+It shows pressure.
+
+Vertical bars rise slowly through the week.
+They do not jump to full height in a single day.
+
+They fill only as much as has been earned.
+
+Every bar is a domain.
+Every domain is a front.
+Every front demands consistency.
+
+---
+
+## The Calendar
+
+The calendar does not show numbers.
+
+It shows memory.
+
+Tap a day and it reveals:
+
+What was trained.
+What was built.
+What was skipped.
+What was protected with grace.
+
+This is not history.
+
+It is accountability.
+
+---
+
+## Architecture (Minimal. Intentional.)
+
+Built with:
+
+- Flutter
+- Riverpod
+- Hive
+- Silence
+
+No cloud.
+No noise.
+No external validation.
+
+Local.
+Personal.
+Controlled.
+
+---
+
+## Scoring Formula
+
+For each domain:
+
+WeeklyScore =  
+(CompletedTasksThisWeek / ScheduledTasksThisWeek) × 100
+
+If grace is used on a day,
+that day’s scheduled tasks are removed from the denominator.
+
+Nothing artificial.
+Nothing inflated.
+
+Only earned percentage.
+
+---
+
+## Streaks
+
+A week is considered successful if:
+
+WeeklyScore ≥ Threshold.
+
+Streaks are not fragile daily threads.
+
+They are weekly verdicts.
+
+---
+
+## Why This Exists
+
+Because ambition without structure decays.
+
+Because intensity without tracking lies.
+
+Because becoming “better” requires measurement.
+
+Igris is not here to motivate.
+
+It is here to measure.
+
+And to remind.
+
+---
+
+## Status
+
+Private.
+Personal.
+Evolving.
+
+Built not to impress others.
+
+Built to make sure I never become ordinary.
+
+---
+
+IGRIS.
