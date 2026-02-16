@@ -67,7 +67,7 @@ class DomainsScreen extends ConsumerWidget {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -168,7 +168,7 @@ class DomainsScreen extends ConsumerWidget {
                                               vertical: 4,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: Theme.of(context).colorScheme.secondary.withOpacity(0.2),
+                                              color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.2),
                                               borderRadius: BorderRadius.circular(8),
                                             ),
                                             child: Text(
@@ -200,41 +200,144 @@ class DomainsScreen extends ConsumerWidget {
   }
 
   void _showAddDomainDialog(BuildContext context, WidgetRef ref) {
+    // Predefined domain options
+    final predefinedDomains = [
+      'DS',
+      'Fitness',
+      'pHysiquE',
+      'Boxing',
+      'Vachan',
+      'PR',
+      'Academics',
+      'Internships',
+      'Face',
+      'Stocks & Market',
+      'Hackathons',
+    ];
+    
     final nameController = TextEditingController();
+    bool showCustomInput = false;
     
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Domain'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(
-            labelText: 'Domain Name',
-            hintText: 'e.g., Health, Work, Learning',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Add Domain'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!showCustomInput) ...[
+                    const Text(
+                      'Select a preset or add custom:',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 12),
+                    // Predefined domain chips
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: predefinedDomains.map((name) {
+                        return ActionChip(
+                          label: Text(name),
+                          onPressed: () {
+                            final domain = Domain(
+                              id: const Uuid().v4(),
+                              name: name,
+                              strength: 0,
+                              isActive: true,
+                            );
+                            ref.read(domainProvider.notifier).addDomain(domain);
+                            Navigator.pop(context);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    // Custom domain button
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Custom Domain'),
+                        onPressed: () {
+                          setState(() {
+                            showCustomInput = true;
+                          });
+                        },
+                      ),
+                    ),
+                  ] else ...[
+                    const Text(
+                      'Enter custom domain name:',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Domain Name',
+                        hintText: 'e.g., Health, Work, Learning',
+                        border: OutlineInputBorder(),
+                      ),
+                      autofocus: true,
+                      onSubmitted: (value) {
+                        if (value.trim().isNotEmpty) {
+                          final domain = Domain(
+                            id: const Uuid().v4(),
+                            name: value.trim(),
+                            strength: 0,
+                            isActive: true,
+                          );
+                          ref.read(domainProvider.notifier).addDomain(domain);
+                          Navigator.pop(context);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      icon: const Icon(Icons.arrow_back),
+                      label: const Text('Back to presets'),
+                      onPressed: () {
+                        setState(() {
+                          showCustomInput = false;
+                          nameController.clear();
+                        });
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
-          autofocus: true,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            if (showCustomInput)
+              TextButton(
+                onPressed: () {
+                  if (nameController.text.trim().isNotEmpty) {
+                    final domain = Domain(
+                      id: const Uuid().v4(),
+                      name: nameController.text.trim(),
+                      strength: 0,
+                      isActive: true,
+                    );
+                    ref.read(domainProvider.notifier).addDomain(domain);
+                    Navigator.pop(context);
+                  }
+                },
+                child: const Text('Add'),
+              ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (nameController.text.trim().isNotEmpty) {
-                final domain = Domain(
-                  id: const Uuid().v4(),
-                  name: nameController.text.trim(),
-                  strength: 0,
-                  isActive: true,
-                );
-                ref.read(domainProvider.notifier).addDomain(domain);
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
       ),
     );
   }

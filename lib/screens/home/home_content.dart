@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/task_provider.dart';
+import '../../providers/weekly_stats_provider.dart';
 import '../../core/utils/date_utils.dart' as app_date_utils;
 import '../../widgets/grace_tokens_display.dart';
 import '../../widgets/domain_progress_bar.dart';
 import '../../widgets/domain_tasks_bottom_sheet.dart';
 
-/// Home content showing today's progress per domain as horizontal bars
+/// Home content showing weekly progress per domain as horizontal bars
 /// 
 /// Visual Design:
 /// - ListView with horizontal progress bars
 /// - Each row shows a horizontal progress bar for one domain
-/// - Bars fill from left to right based on completion percentage
+/// - Bars fill from left to right based on weekly completion percentage
 /// - Tapping a bar opens bottom sheet with tasks
+/// - Shows weekly score and current streak
 /// 
 /// Data Flow:
-/// - Watches todayProgressProvider (Map<Domain, double>)
+/// - Watches weeklyStatsProvider (WeeklyStats)
 /// - Provider auto-recalculates when:
 ///   * Tasks are completed/uncompleted
 ///   * Tasks are added/removed
@@ -26,14 +27,19 @@ class HomeContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch progress map - rebuilds when any task completion changes
-    final progressMap = ref.watch(todayProgressProvider);
+    // Watch weekly stats - rebuilds when any task completion changes
+    final weeklyStats = ref.watch(weeklyStatsProvider);
     
     final today = app_date_utils.DateUtils.today;
     final todayFormatted = app_date_utils.DateUtils.formatDateLong(today);
     
-    // Get domains sorted by name for consistent grid layout
-    final domains = progressMap.keys.toList()
+    // Get start and end of week for display
+    final startOfWeek = app_date_utils.DateUtils.getStartOfWeek(today);
+    final endOfWeek = app_date_utils.DateUtils.getEndOfWeek(today);
+    final weekRange = '${app_date_utils.DateUtils.formatDateShort(startOfWeek)} - ${app_date_utils.DateUtils.formatDateShort(endOfWeek)}';
+    
+    // Get domains sorted by name for consistent layout
+    final domains = weeklyStats.weeklyProgress.keys.toList()
       ..sort((a, b) => a.name.compareTo(b.name));
 
     return Scaffold(
@@ -54,7 +60,14 @@ class HomeContent extends ConsumerWidget {
                     todayFormatted,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Week: $weekRange',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   // Grace tokens display
                   const GraceTokensDisplay(),
                 ],
@@ -63,11 +76,113 @@ class HomeContent extends ConsumerWidget {
             
             const Divider(height: 1),
             
-            // Progress bars grid
+            // Weekly stats cards
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  // Weekly Score Card
+                  Expanded(
+                    child: _buildStatCard(
+                      context,
+                      'Weekly Score',
+                      '${weeklyStats.weeklyScore.toStringAsFixed(0)}%',
+                      Icons.analytics,
+                      Colors.blueAccent,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Streak Card
+                  Expanded(
+                    child: _buildStatCard(
+                      context,
+                      'Streak',
+                      '${weeklyStats.currentStreak} days',
+                      Icons.local_fire_department,
+                      Colors.orangeAccent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const Divider(height: 1),
+            
+            // Section header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Weekly Progress',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '(${weeklyStats.completedTasksThisWeek}/${weeklyStats.totalTasksThisWeek})',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Cumulative across all 7 days of the week',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Progress bars list
             Expanded(
               child: domains.isEmpty
                   ? _buildEmptyState(context)
-                  : _buildProgressList(context, ref, domains, progressMap),
+                  : _buildProgressList(context, ref, domains, weeklyStats.weeklyProgress),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// Stat card widget for weekly score and streak
+  Widget _buildStatCard(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: color,
+              size: 28,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
             ),
           ],
         ),
