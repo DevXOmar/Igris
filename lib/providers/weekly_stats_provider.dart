@@ -61,6 +61,10 @@ final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
     final domainTotalForWeek = domainTasks.length * 7;
     int domainCompletedThisWeek = 0;
     
+    print('\n=== ${domain.name} ===');
+    print('Tasks in domain: ${domainTasks.length}');
+    print('TotalScheduledInstancesThisWeek: $domainTotalForWeek (${domainTasks.length} tasks × 7 days)');
+    
     // Count completed tasks from Monday through today
     for (int i = 0; i < 7; i++) {
       final date = startOfWeek.add(Duration(days: i));
@@ -85,6 +89,8 @@ final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
       }
     }
     
+    print('CompletedInstancesThisWeek: $domainCompletedThisWeek');
+    
     // Add this domain's total to overall total
     totalTasksThisWeek += domainTotalForWeek;
     
@@ -93,6 +99,7 @@ final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
         ? domainCompletedThisWeek / domainTotalForWeek 
         : 0.0;
     weeklyProgress[domain] = progress;
+    print('Progress: ${(progress * 100).toStringAsFixed(1)}% ($domainCompletedThisWeek/$domainTotalForWeek)');
   }
   
   // Calculate weekly score against FULL WEEK total

@@ -1,23 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/grace_provider.dart';
+import '../core/theme/app_theme.dart';
 
 /// Widget for displaying remaining grace tokens
-/// Shows weekly grace tokens with visual indicators
+/// Shows weekly grace tokens with visual indicators (Golden theme)
 class GraceTokensDisplay extends ConsumerWidget {
   const GraceTokensDisplay({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final graceState = ref.watch(graceProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Theme.of(context).dividerColor,
+          color: colorScheme.royalGold.withOpacity(0.3),
           width: 1,
         ),
       ),
@@ -25,7 +27,7 @@ class GraceTokensDisplay extends ConsumerWidget {
         children: [
           Icon(
             Icons.shield,
-            color: Theme.of(context).colorScheme.secondary,
+            color: colorScheme.royalGold,
             size: 20,
           ),
           const SizedBox(width: 8),
@@ -46,22 +48,25 @@ class GraceTokensDisplay extends ConsumerWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: index < graceState.weeklyGraceLeft
-                          ? Theme.of(context).colorScheme.secondary
-                          : Theme.of(context)
-                              .colorScheme
-                              .secondary
-                              .withOpacity(0.2),
+                          ? colorScheme.royalGold
+                          : colorScheme.royalGold.withOpacity(0.15),
+                      boxShadow: index < graceState.weeklyGraceLeft
+                          ? [
+                              BoxShadow(
+                                color: colorScheme.royalGold.withOpacity(0.4),
+                                blurRadius: 6,
+                                spreadRadius: 1,
+                              ),
+                            ]
+                          : null,
                     ),
                     child: Center(
                       child: Icon(
                         Icons.shield,
                         size: 14,
                         color: index < graceState.weeklyGraceLeft
-                            ? Theme.of(context).colorScheme.onSecondary
-                            : Theme.of(context)
-                                .colorScheme
-                                .secondary
-                                .withOpacity(0.5),
+                            ? Colors.black.withOpacity(0.8)
+                            : colorScheme.royalGold.withOpacity(0.4),
                       ),
                     ),
                   ),
@@ -72,7 +77,7 @@ class GraceTokensDisplay extends ConsumerWidget {
           Text(
             '${graceState.weeklyGraceLeft}/${graceState.maxGraceTokens}',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
+                  color: colorScheme.royalGold,
                   fontWeight: FontWeight.bold,
                 ),
           ),

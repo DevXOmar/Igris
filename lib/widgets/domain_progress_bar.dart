@@ -1,74 +1,107 @@
 import 'package:flutter/material.dart';
 import '../models/domain.dart';
-import '../core/utils/color_utils.dart';
+import '../core/theme/app_theme.dart';
 
 /// Widget displaying a horizontal progress bar for a domain
 /// 
 /// Visual structure:
 /// - Fixed height horizontal bar (50px)
-/// - Background bar (grey) with foreground bar (colored) on top
-/// - Domain name displayed inside the bar on the left
-/// - Percentage displayed inside the bar on the right
-/// - Foreground bar fills from left to right based on progress
-/// - Each domain gets a unique color based on its ID
+/// - Background bar (elevated surface) with thin neon blue border
+/// - Foreground bar fills from left, color based on domain index
+/// - Domain name displayed INSIDE bar (left side)
+/// - Percentage displayed INSIDE bar (right side)
+/// - Subtle glow at >= 90% progress, stronger glow at 100%
 /// 
-/// Progress calculation happens in provider, this widget just displays it
+/// Progress Calculation:
+/// - Shows WEEKLY CUMULATIVE progress (not just today)
+/// - Progress = CompletedInstancesThisWeek / TotalScheduledInstancesThisWeek
+/// - Bars gradually fill as tasks are completed throughout the week
+/// - 100% reached only when ALL task instances for ENTIRE week are done
+/// 
+/// Each domain gets a unique color from the theme's color cycle
 class DomainProgressBar extends StatelessWidget {
   final Domain domain;
   final double progress; // 0.0 to 1.0
+  final int domainIndex; // For color assignment
   final VoidCallback onTap;
 
   const DomainProgressBar({
     super.key,
     required this.domain,
     required this.progress,
+    required this.domainIndex,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     // Clamp progress to valid range
     final clampedProgress = progress.clamp(0.0, 1.0);
     
-    // Generate unique color for this domain
-    final domainColor = ColorUtils.generateDomainColor(domain.id);
-    final progressColor = clampedProgress == 1.0 
-        ? ColorUtils.getDarkerShade(domainColor)  // Darker shade when complete
-        : domainColor;
+    // Get domain-specific color from color cycle
+    final domainColor = AppTheme.getDomainColor(domainIndex);
+    
+    // Determine glow effect based on progress
+    final bool hasSubtleGlow = clampedProgress >= 0.9;
+    final bool hasStrongGlow = clampedProgress >= 1.0;
+    
+    // Debug print - shows weekly cumulative progress
+    print('📊 ${domain.name}: ${(clampedProgress * 100).toStringAsFixed(1)}% (Weekly Cumulative)');
     
     return GestureDetector(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: SizedBox(
-          height: 50, // fixed height for horizontal bar
+        padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutCubic,
+          height: 50,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: hasStrongGlow
+                ? AppTheme.blueGlowStrong
+                : hasSubtleGlow
+                    ? AppTheme.blueGlowSubtle
+                    : AppTheme.elevationShadow,
+          ),
           child: Stack(
             alignment: Alignment.centerLeft,
             children: [
-              // Background bar (grey, full width)
+              // Background bar with thin neon border
               Container(
                 height: 50,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade800,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              // Foreground bar (colored, fills from left)
-              FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: clampedProgress > 0.05 ? clampedProgress : 0.05, // Minimum width for visibility
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: progressColor,
-                    borderRadius: BorderRadius.circular(12),
+                  color: colorScheme.backgroundElevated,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: colorScheme.neonBlue.withOpacity(0.3),
+                    width: 1,
                   ),
                 ),
               ),
-              // Text overlay - Domain name and percentage
+              
+              // Foreground progress bar (fills from left)
+              FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: clampedProgress,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOutCubic,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: domainColor,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+              
+              // Content overlay - Domain name and percentage
               Positioned.fill(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -76,15 +109,15 @@ class DomainProgressBar extends StatelessWidget {
                       Expanded(
                         child: Text(
                           domain.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: colorScheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.6,
                             shadows: [
                               Shadow(
-                                offset: Offset(1, 1),
-                                blurRadius: 2,
-                                color: Colors.black54,
+                                offset: const Offset(0, 1),
+                                blurRadius: 3,
+                                color: Colors.black.withOpacity(0.7),
                               ),
                             ],
                           ),
@@ -92,22 +125,23 @@ class DomainProgressBar extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      // Percentage on the right
+                      
+                      // Percentage on the right (always show)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
+                          horizontal: 12,
+                          vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           '${(clampedProgress * 100).toInt()}%',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: colorScheme.textPrimary,
                             fontWeight: FontWeight.bold,
+                            fontSize: 13,
                           ),
                         ),
                       ),
