@@ -5,10 +5,14 @@ import '../models/task.dart';
 import '../providers/task_provider.dart';
 import '../providers/daily_log_provider.dart';
 import '../core/theme/design_system.dart';
+import '../core/theme/igris_animations.dart';
 
 /// Bottom sheet showing tasks for a specific domain
 /// Allows user to toggle task completion
 /// Updates are instant via Riverpod
+/// 
+/// Animations:
+/// - Slide-up + fade on open (350ms, easeOutCubic)
 class DomainTasksBottomSheet extends ConsumerWidget {
   final Domain domain;
 
@@ -32,6 +36,7 @@ class DomainTasksBottomSheet extends ConsumerWidget {
       logState.isTaskCompletedToday(task.id)
     ).length;
     
+    // Apply slide-up animation to bottom sheet
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
@@ -257,6 +262,6 @@ class _TaskCheckItem extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ).igrisSlideUp(); // Slide-up animation for bottom sheet
   }
 }

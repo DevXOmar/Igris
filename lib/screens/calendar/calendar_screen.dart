@@ -7,6 +7,7 @@ import '../../providers/domain_provider.dart';
 import '../../core/utils/date_utils.dart' as app_date_utils;
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
+import '../../core/theme/igris_animations.dart';
 import '../../widgets/layout/igris_screen_scaffold.dart';
 import '../../widgets/ui/igris_ui.dart';
 
@@ -14,6 +15,10 @@ import '../../widgets/ui/igris_ui.dart';
 /// - TableCalendar wrapped in IgrisCard
 /// - Today: neonBlue filled, Selected: bloodRed outline
 /// - Completed tasks grouped by domain with gold accents
+/// 
+/// Animations:
+/// - Task list fades in when date selection changes
+/// - No looping animations on calendar cells
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
 
@@ -202,7 +207,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             Expanded(
               child: SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
+                // Fade-in animation on date change (key forces re-animation)
                 child: Column(
+                  key: ValueKey('tasks_${day.toString()}'),
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Completion summary card
@@ -272,7 +279,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     // List of domains with progress
                     _buildDomainProgressList(log, taskState, domainState),
                   ],
-                ),
+                ).igrisFadeIn(), // Fade-in when date changes (re-animated via key)
               ),
             ),
         ],

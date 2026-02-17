@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
+import '../../core/theme/igris_animations.dart';
 import '../../providers/domain_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../models/domain.dart';
@@ -12,6 +13,10 @@ import '../../widgets/layout/igris_screen_scaffold.dart';
 
 /// Domains screen for managing life domains and their tasks
 /// Refactored with Igris UI components for consistent styling
+/// 
+/// Animations:
+/// - Card fade-in on mount
+/// - Subtle highlight glow when progress >= 90%
 class DomainsScreen extends ConsumerWidget {
   const DomainsScreen({super.key});
 
@@ -69,6 +74,7 @@ class DomainsScreen extends ConsumerWidget {
                 final weeklyScore = (domain.strength / 100.0).clamp(0.0, 1.0);
                 final shouldGlow = weeklyScore >= 0.90;
                 
+                // Wrap card with fade-in animation (staggered)
                 return Padding(
                   padding: EdgeInsets.only(bottom: DesignSystem.spacing16),
                   child: IgrisCard(
@@ -261,7 +267,7 @@ class DomainsScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
-                );
+                ).igrisFadeIn(delayMs: getStaggerDelay(index)); // Staggered fade-in for cards
               },
             ),
     );
