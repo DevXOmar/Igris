@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/weekly_stats_provider.dart';
 import '../../core/utils/date_utils.dart' as app_date_utils;
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/design_system.dart';
 import '../../widgets/grace_tokens_display.dart';
 import '../../widgets/domain_progress_bar.dart';
 import '../../widgets/domain_tasks_bottom_sheet.dart';
@@ -76,7 +77,7 @@ class HomeContent extends ConsumerWidget {
             SliverToBoxAdapter(
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                padding: DesignSystem.paddingAll16,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -84,14 +85,14 @@ class HomeContent extends ConsumerWidget {
                       todayFormatted,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: DesignSystem.spacing4),
                     Text(
                       'Week: $weekRange',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).textTheme.bodySmall?.color,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: DesignSystem.spacing12),
                     // Grace tokens display
                     const GraceTokensDisplay(),
                   ],
@@ -104,7 +105,7 @@ class HomeContent extends ConsumerWidget {
             // Weekly stats cards
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: DesignSystem.paddingAll16,
                 child: Row(
                   children: [
                     // Weekly Score Card
@@ -117,7 +118,7 @@ class HomeContent extends ConsumerWidget {
                         AppTheme.deepBlue,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: DesignSystem.spacing12),
                     // Streak Card  
                     Expanded(
                       child: _buildStatCard(
@@ -138,7 +139,12 @@ class HomeContent extends ConsumerWidget {
             // Section header
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: EdgeInsets.fromLTRB(
+                  DesignSystem.spacing16,
+                  DesignSystem.spacing12,
+                  DesignSystem.spacing16,
+                  DesignSystem.spacing8,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -150,7 +156,7 @@ class HomeContent extends ConsumerWidget {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: DesignSystem.spacing8),
                         Text(
                           '(${weeklyStats.completedTasksThisWeek}/${weeklyStats.totalTasksThisWeek})',
                           style: Theme.of(context).textTheme.bodyMedium,
@@ -183,10 +189,10 @@ class HomeContent extends ConsumerWidget {
                         
                         return Padding(
                           padding: EdgeInsets.fromLTRB(
-                            16,
-                            index == 0 ? 16 : 8,
-                            16,
-                            index == domains.length - 1 ? 16 : 8,
+                            DesignSystem.spacing16,
+                            index == 0 ? DesignSystem.spacing16 : DesignSystem.spacing8,
+                            DesignSystem.spacing16,
+                            index == domains.length - 1 ? DesignSystem.spacing16 : DesignSystem.spacing8,
                           ),
                           child: DomainProgressBar(
                             domain: domain,
@@ -217,13 +223,13 @@ class HomeContent extends ConsumerWidget {
     Color color,
   ) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(DesignSystem.spacing24 - 4), // 20px
       decoration: BoxDecoration(
         color: AppTheme.backgroundElevated,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: DesignSystem.radiusStandard,
         border: Border.all(
           color: Theme.of(context).colorScheme.outline,
-          width: 1,
+          width: DesignSystem.borderThin,
         ),
       ),
       child: Column(
@@ -231,9 +237,9 @@ class HomeContent extends ConsumerWidget {
           Icon(
             icon,
             color: color,
-            size: 32,
+            size: DesignSystem.iconLarge,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: DesignSystem.spacing12),
           Text(
             value,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -264,50 +270,21 @@ class HomeContent extends ConsumerWidget {
         children: [
           Icon(
             Icons.dashboard,
-            size: 64,
+            size: DesignSystem.iconHero,
             color: Theme.of(context).textTheme.bodyMedium?.color,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: DesignSystem.spacing16),
           Text(
             'No active domains',
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: DesignSystem.spacing8),
           Text(
             'Create domains in the Domains tab',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
       ),
-    );
-  }
-
-  /// List of horizontal progress bars
-  /// One bar per domain, stacked vertically
-  Widget _buildProgressList(
-    BuildContext context,
-    WidgetRef ref,
-    List domains,
-    Map progressMap,
-  ) {
-    return ListView.builder(
-      physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      itemCount: domains.length,
-      itemBuilder: (context, index) {
-        final domain = domains[index];
-        final progress = progressMap[domain] ?? 0.0;
-        
-        return DomainProgressBar(
-          domain: domain,
-          progress: progress,
-          domainIndex: index,
-          onTap: () {
-            // Show tasks bottom sheet when bar is tapped
-            _showDomainTasks(context, domain);
-          },
-        );
-      },
     );
   }
 

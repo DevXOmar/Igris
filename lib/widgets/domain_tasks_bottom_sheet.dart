@@ -4,6 +4,7 @@ import '../models/domain.dart';
 import '../models/task.dart';
 import '../providers/task_provider.dart';
 import '../providers/daily_log_provider.dart';
+import '../core/theme/design_system.dart';
 
 /// Bottom sheet showing tasks for a specific domain
 /// Allows user to toggle task completion
@@ -34,11 +35,11 @@ class DomainTasksBottomSheet extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(20),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(DesignSystem.spacing16 + 4), // 20px
         ),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      padding: EdgeInsets.symmetric(vertical: DesignSystem.spacing16 + 4), // 20px
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -52,11 +53,11 @@ class DomainTasksBottomSheet extends ConsumerWidget {
             ),
           ),
           
-          const SizedBox(height: 16),
+          SizedBox(height: DesignSystem.spacing16),
           
           // Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: EdgeInsets.symmetric(horizontal: DesignSystem.spacing16 + 4), // 20px
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -69,13 +70,13 @@ class DomainTasksBottomSheet extends ConsumerWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: DesignSystem.spacing12,
+                        vertical: DesignSystem.spacing4 + 2, // 6px
                       ),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: DesignSystem.radiusSmall,
                       ),
                       child: Text(
                         '$completedCount / ${domainTasks.length}',
@@ -88,7 +89,7 @@ class DomainTasksBottomSheet extends ConsumerWidget {
                   ],
                 ),
                 
-                const SizedBox(height: 8),
+                SizedBox(height: DesignSystem.spacing8),
                 
                 Text(
                   'Today\'s Tasks',
@@ -98,26 +99,26 @@ class DomainTasksBottomSheet extends ConsumerWidget {
             ),
           ),
           
-          const SizedBox(height: 16),
+          SizedBox(height: DesignSystem.spacing16),
           const Divider(height: 1),
           
           // Tasks list
           if (domainTasks.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(40),
+              padding: EdgeInsets.all(DesignSystem.spacing32 + 8), // 40px
               child: Column(
                 children: [
                   Icon(
                     Icons.task_alt,
-                    size: 48,
+                    size: DesignSystem.iconXLarge,
                     color: Theme.of(context).textTheme.bodyMedium?.color,
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: DesignSystem.spacing12),
                   Text(
                     'No tasks yet',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: DesignSystem.spacing4),
                   Text(
                     'Add tasks in the Domains screen',
                     style: Theme.of(context).textTheme.bodySmall,
@@ -130,7 +131,10 @@ class DomainTasksBottomSheet extends ConsumerWidget {
               child: ListView.builder(
                 physics: const ClampingScrollPhysics(),
                 shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: EdgeInsets.symmetric(
+                  horizontal: DesignSystem.spacing16 + 4, // 20px
+                  vertical: DesignSystem.spacing8,
+                ),
                 itemCount: domainTasks.length,
                 itemBuilder: (context, index) {
                   final task = domainTasks[index];
@@ -150,7 +154,7 @@ class DomainTasksBottomSheet extends ConsumerWidget {
               ),
             ),
           
-          const SizedBox(height: 8),
+          SizedBox(height: DesignSystem.spacing8),
         ],
       ),
     );
@@ -173,9 +177,12 @@ class _TaskCheckItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onToggle,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: DesignSystem.radiusSmall,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        padding: EdgeInsets.symmetric(
+          vertical: DesignSystem.spacing12,
+          horizontal: DesignSystem.spacing8,
+        ),
         child: Row(
           children: [
             // Checkbox
@@ -203,7 +210,7 @@ class _TaskCheckItem extends StatelessWidget {
                   : null,
             ),
             
-            const SizedBox(width: 12),
+            SizedBox(width: DesignSystem.spacing12),
             
             // Task title
             Expanded(
@@ -223,23 +230,23 @@ class _TaskCheckItem extends StatelessWidget {
             // Recurring badge
             if (task.isRecurring)
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
+                padding: EdgeInsets.symmetric(
+                  horizontal: DesignSystem.spacing8,
+                  vertical: DesignSystem.spacing4,
                 ),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.secondary.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(DesignSystem.spacing8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.repeat,
-                      size: 12,
+                      size: DesignSystem.spacing12,
                       color: Theme.of(context).colorScheme.secondary,
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: DesignSystem.spacing4),
                     Text(
                       'Daily',
                       style: Theme.of(context).textTheme.bodySmall,

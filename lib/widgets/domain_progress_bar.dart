@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/domain.dart';
 import '../core/theme/app_theme.dart';
+import '../core/theme/design_system.dart';
 
 /// Widget displaying a horizontal progress bar for a domain
 /// 
@@ -54,13 +55,16 @@ class DomainProgressBar extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
+        padding: EdgeInsets.symmetric(
+          vertical: DesignSystem.spacing8 + 2, // 10px
+          horizontal: DesignSystem.spacing16,
+        ),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 600),
           curve: Curves.easeOutCubic,
           height: 50,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: DesignSystem.radiusStandard,
             boxShadow: hasStrongGlow
                 ? AppTheme.blueGlowStrong
                 : hasSubtleGlow
@@ -75,10 +79,10 @@ class DomainProgressBar extends StatelessWidget {
                 height: 50,
                 decoration: BoxDecoration(
                   color: colorScheme.backgroundElevated,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: DesignSystem.radiusStandard,
                   border: Border.all(
                     color: colorScheme.neonBlue.withOpacity(0.3),
-                    width: 1,
+                    width: DesignSystem.borderThin,
                   ),
                 ),
               ),
@@ -93,7 +97,7 @@ class DomainProgressBar extends StatelessWidget {
                   height: 50,
                   decoration: BoxDecoration(
                     color: domainColor,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: DesignSystem.radiusStandard,
                   ),
                 ),
               ),
@@ -101,7 +105,9 @@ class DomainProgressBar extends StatelessWidget {
               // Content overlay - Domain name and percentage
               Positioned.fill(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: DesignSystem.spacing16 + 4, // 20px
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -128,13 +134,13 @@ class DomainProgressBar extends StatelessWidget {
                       
                       // Percentage on the right (always show)
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: DesignSystem.spacing12,
+                          vertical: DesignSystem.spacing4 + 2, // 6px
                         ),
                         decoration: BoxDecoration(
                           color: Colors.black.withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(DesignSystem.spacing8 + 2), // 10px
                         ),
                         child: Text(
                           '${(clampedProgress * 100).toInt()}%',

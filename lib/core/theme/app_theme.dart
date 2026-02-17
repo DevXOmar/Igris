@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'design_system.dart';
 
 /// ═══════════════════════════════════════════════════════════════════════════
 /// IGRIS THEME - SOLO LEVELING INSPIRED SYSTEM UI
@@ -189,12 +190,12 @@ class AppTheme {
       /// CARD - Deep surface with border
       cardTheme: CardThemeData(
         color: backgroundSurface,
-        elevation: 0,
+        elevation: DesignSystem.elevation0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: DesignSystem.radiusStandard,
           side: BorderSide(
             color: dividerColor,
-            width: 1,
+            width: DesignSystem.borderThin,
           ),
         ),
       ),
@@ -204,11 +205,14 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: backgroundElevated,
           foregroundColor: textPrimary,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          elevation: DesignSystem.elevation0,
+          padding: EdgeInsets.symmetric(
+            horizontal: DesignSystem.spacing24,
+            vertical: DesignSystem.spacing16,
+          ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: neonBlue, width: 1),
+            borderRadius: DesignSystem.radiusStandard,
+            side: const BorderSide(color: neonBlue, width: DesignSystem.borderThin),
           ),
         ),
       ),
@@ -217,10 +221,13 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: textPrimary,
-          side: const BorderSide(color: neonBlue, width: 1),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          side: const BorderSide(color: neonBlue, width: DesignSystem.borderThin),
+          padding: EdgeInsets.symmetric(
+            horizontal: DesignSystem.spacing24,
+            vertical: DesignSystem.spacing16,
+          ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: DesignSystem.radiusStandard,
           ),
         ),
       ),
@@ -229,7 +236,10 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: neonBlue,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: DesignSystem.spacing16,
+            vertical: DesignSystem.spacing12,
+          ),
         ),
       ),
 
@@ -238,22 +248,22 @@ class AppTheme {
         filled: true,
         fillColor: backgroundElevated,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: DesignSystem.radiusStandard,
           borderSide: const BorderSide(color: dividerColor),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: DesignSystem.radiusStandard,
           borderSide: const BorderSide(color: dividerColor),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: neonBlue, width: 2),
+          borderRadius: DesignSystem.radiusStandard,
+          borderSide: const BorderSide(color: neonBlue, width: DesignSystem.borderMedium),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: DesignSystem.radiusStandard,
           borderSide: const BorderSide(color: bloodRed),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: DesignSystem.paddingAll16,
         hintStyle: const TextStyle(color: textMuted),
       ),
 
@@ -369,9 +379,9 @@ class AppTheme {
       /// DIALOG
       dialogTheme: DialogThemeData(
         backgroundColor: backgroundSurface,
-        elevation: 8,
+        elevation: DesignSystem.elevation8,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: DesignSystem.radiusLarge,
           side: const BorderSide(color: dividerColor),
         ),
       ),
@@ -381,7 +391,7 @@ class AppTheme {
         backgroundColor: backgroundElevated,
         contentTextStyle: const TextStyle(color: textPrimary),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: DesignSystem.radiusStandard,
         ),
         behavior: SnackBarBehavior.floating,
       ),
@@ -406,8 +416,8 @@ class AppTheme {
           if (states.contains(WidgetState.selected)) return neonBlue;
           return Colors.transparent;
         }),
-        side: const BorderSide(color: dividerColor, width: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        side: const BorderSide(color: dividerColor, width: DesignSystem.borderMedium),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DesignSystem.spacing4)),
       ),
 
       /// RADIO
