@@ -128,6 +128,7 @@ class DomainTasksBottomSheet extends ConsumerWidget {
           else
             Flexible(
               child: ListView.builder(
+                physics: const ClampingScrollPhysics(),
                 shrinkWrap: true,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 itemCount: domainTasks.length,

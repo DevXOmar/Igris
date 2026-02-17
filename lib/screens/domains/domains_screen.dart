@@ -44,6 +44,7 @@ class DomainsScreen extends ConsumerWidget {
               ),
             )
           : ListView.builder(
+              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.all(16),
               itemCount: domainState.domains.length,
               itemBuilder: (context, index) {
@@ -226,6 +227,7 @@ class DomainsScreen extends ConsumerWidget {
           content: SizedBox(
             width: double.maxFinite,
             child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,

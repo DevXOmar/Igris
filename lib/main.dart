@@ -7,6 +7,26 @@ import 'models/task.dart';
 import 'models/daily_log.dart';
 import 'screens/home/home_screen.dart';
 
+class _AppScrollBehavior extends MaterialScrollBehavior {
+  const _AppScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const ClampingScrollPhysics();
+  }
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    // Disable Android glow/stretch overscroll effects for a tighter, more
+    // "professional" feel across all scrollables.
+    return child;
+  }
+}
+
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +63,7 @@ class IgrisApp extends StatelessWidget {
     return MaterialApp(
       title: 'Igris',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const _AppScrollBehavior(),
       theme: AppTheme.darkTheme,
       home: const HomeScreen(),
     );

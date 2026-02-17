@@ -22,6 +22,7 @@ class SettingsScreen extends ConsumerWidget {
         title: const Text('Settings'),
       ),
       body: ListView(
+        physics: const ClampingScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
           // Grace System Section

@@ -273,6 +273,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     }
     
     return ListView.builder(
+      physics: const ClampingScrollPhysics(),
       itemCount: domainsWithTasks.length,
       itemBuilder: (context, index) {
         final domain = domainsWithTasks[index]!;

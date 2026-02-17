@@ -69,105 +69,138 @@ class HomeContent extends ConsumerWidget {
         ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
+        child: CustomScrollView(
+          physics: const ClampingScrollPhysics(),
+          slivers: [
             // Date header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    todayFormatted,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Week: $weekRange',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).textTheme.bodySmall?.color,
+            SliverToBoxAdapter(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      todayFormatted,
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Grace tokens display
-                  const GraceTokensDisplay(),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Week: $weekRange',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Grace tokens display
+                    const GraceTokensDisplay(),
+                  ],
+                ),
               ),
             ),
             
-            const Divider(height: 1),
+            const SliverToBoxAdapter(child: Divider(height: 1)),
             
             // Weekly stats cards
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // Weekly Score Card
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      'Weekly Score',
-                      '${weeklyStats.weeklyScore.toStringAsFixed(0)}%',
-                      Icons.analytics_outlined,
-                      AppTheme.deepBlue,
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    // Weekly Score Card
+                    Expanded(
+                      child: _buildStatCard(
+                        context,
+                        'Weekly Score',
+                        '${weeklyStats.weeklyScore.toStringAsFixed(0)}%',
+                        Icons.analytics_outlined,
+                        AppTheme.deepBlue,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Streak Card  
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      'Streak',
-                      '${weeklyStats.currentStreak} days',
-                      Icons.local_fire_department_outlined,
-                      AppTheme.bloodRedActive,
+                    const SizedBox(width: 12),
+                    // Streak Card  
+                    Expanded(
+                      child: _buildStatCard(
+                        context,
+                        'Streak',
+                        '${weeklyStats.currentStreak} days',
+                        Icons.local_fire_department_outlined,
+                        AppTheme.bloodRedActive,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             
-            const Divider(height: 1),
+            const SliverToBoxAdapter(child: Divider(height: 1)),
             
             // Section header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        'Weekly Progress',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Weekly Progress',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '(${weeklyStats.completedTasksThisWeek}/${weeklyStats.totalTasksThisWeek})',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Bars fill as you complete tasks across all 7 days',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                        const SizedBox(width: 8),
+                        Text(
+                          '(${weeklyStats.completedTasksThisWeek}/${weeklyStats.totalTasksThisWeek})',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      'Bars fill as you complete tasks across all 7 days',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             
             // Progress bars list
-            Expanded(
-              child: domains.isEmpty
-                  ? _buildEmptyState(context)
-                  : _buildProgressList(context, ref, domains, weeklyStats.weeklyProgress),
-            ),
+            domains.isEmpty
+                ? SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildEmptyState(context),
+                  )
+                : SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final domain = domains[index];
+                        final progress = weeklyStats.weeklyProgress[domain] ?? 0.0;
+                        
+                        return Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            16,
+                            index == 0 ? 16 : 8,
+                            16,
+                            index == domains.length - 1 ? 16 : 8,
+                          ),
+                          child: DomainProgressBar(
+                            domain: domain,
+                            progress: progress,
+                            domainIndex: index,
+                            onTap: () {
+                              _showDomainTasks(context, domain);
+                            },
+                          ),
+                        );
+                      },
+                      childCount: domains.length,
+                    ),
+                  ),
           ],
         ),
       ),
@@ -226,6 +259,7 @@ class HomeContent extends ConsumerWidget {
   Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
@@ -257,6 +291,7 @@ class HomeContent extends ConsumerWidget {
     Map progressMap,
   ) {
     return ListView.builder(
+      physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: domains.length,
       itemBuilder: (context, index) {
