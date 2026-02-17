@@ -118,12 +118,42 @@ class DesignSystem {
   /// ═══════════════════════════════════════════════════════════════════════
   /// ELEVATION & SHADOWS - Standard elevation levels
   /// ═══════════════════════════════════════════════════════════════════════
+  /// 
+  /// Elevation creates depth hierarchy in the UI. Use consistently:
+  /// 
+  /// elevation0 (0dp) - Flat elements
+  ///   • Cards flush with background
+  ///   • Buttons (use borders instead)
+  ///   • List items
+  ///   • Most UI elements (Igris style is flat)
+  /// 
+  /// elevation1 (1dp) - Subtle lift
+  ///   • Hover states (rare - prefer glow effects)
+  ///   • Nested cards
+  /// 
+  /// elevation2 (2dp) - Standard elevation
+  ///   • Resting cards (if needed)
+  ///   • App bar (if not transparent)
+  /// 
+  /// elevation4 (4dp) - Floating elements
+  ///   • FAB (Floating Action Button)
+  ///   • Active states
+  ///   • Dragged elements
+  /// 
+  /// elevation8 (8dp) - Modal surfaces
+  ///   • Dialogs
+  ///   • Modal sheets
+  ///   • Dropdown menus
+  ///   • Navigation drawer
+  /// 
+  /// RULE: Igris design prefers FLAT (elevation0) with GLOWS over traditional shadows.
+  /// Use AppTheme.blueGlowSubtle/Strong, redGlowSubtle, or purpleGlow* for depth.
 
-  static const double elevation0 = 0.0;
-  static const double elevation1 = 1.0;
-  static const double elevation2 = 2.0;
-  static const double elevation4 = 4.0;
-  static const double elevation8 = 8.0;
+  static const double elevation0 = 0.0;  // Flat (default)
+  static const double elevation1 = 1.0;  // Subtle
+  static const double elevation2 = 2.0;  // Standard
+  static const double elevation4 = 4.0;  // Floating
+  static const double elevation8 = 8.0;  // Modal
 
   /// ═══════════════════════════════════════════════════════════════════════
   /// DIVIDER & BORDER WIDTHS - Standard line thicknesses

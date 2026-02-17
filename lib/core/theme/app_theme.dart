@@ -1,6 +1,75 @@
 import 'package:flutter/material.dart';
 import 'design_system.dart';
 
+/// Centralized color palette.
+///
+/// Keep ALL app colors here to ensure consistency across widgets, screens,
+/// and the ThemeData configuration.
+class AppColors {
+  AppColors._();
+
+  // Base Backgrounds - Deep black system with subtle purple undertones
+  static const Color backgroundPrimary = Color(0xFF0A0F1C);
+  static const Color backgroundSurface = Color(0xFF121A2A);
+  static const Color backgroundElevated = Color(0xFF182235);
+
+  // Primary Accent Blues - Enhanced neon for motivational glow
+  static const Color neonBlue = Color(0xFF5BCFFF); // was 0xFF81D8F0
+  static const Color deepBlue = Color(0xFF4DA6C5);
+
+  // Deep Navies - Supporting structure tones
+  static const Color navyDeep = Color(0xFF1F3A8A);
+  static const Color navyDarker = Color(0xFF0F3460);
+
+  // Blood Red - Intensity accent (slightly brighter)
+  static const Color bloodRed = Color(0xFF8B0000); // was 0xFF70020F
+  static const Color bloodRedActive = Color(0xFF9E1A28); // was 0xFF8C0A18
+
+  // Royal Gold - Premium highlight (rare use only)
+  static const Color royalGold = Color(0xFFFFD700);
+  static const Color royalGoldDark = Color(0xFFB8860B);
+
+  // Purple Accents - Igris aura
+  static const Color shadowPurple = Color(0xFF9450F2);
+  static const Color deepPurple = Color(0xFF483C59);
+
+  // Text Hierarchy
+  static const Color textPrimary = Color(0xFFE6EDF3);
+  static const Color textSecondary = Color(0xFF9FB3C8);
+  static const Color textMuted = Color(0xFF5C6B7A);
+  static const Color textHighlight = Color(0xFFD1A0F2);
+
+  // UI Elements
+  static const Color dividerColor = Color(0xFF1E293B);
+  static const Color glowEffect = Color(0xFFEBBAF2);
+  
+  // Additional UI Colors
+  static const Color surfaceContainer = backgroundSurface;
+  static const Color border = dividerColor;
+  static const Color gold = royalGold;
+
+  /// DOMAIN BAR COLORS - Expanded multi-color histogram system
+  static const List<Color> domainBarColors = [
+    deepBlue,
+    neonBlue,
+    bloodRed,
+    royalGold,
+    navyDeep,
+    navyDarker,
+    shadowPurple,
+    deepPurple,
+  ];
+
+  /// Optional helper (not used by default Theme rules).
+  static LinearGradient motivationalGradient(Color start, Color end) {
+    return LinearGradient(
+      colors: [start, end],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+  }
+}
+
 /// ═══════════════════════════════════════════════════════════════════════════
 /// IGRIS THEME - SOLO LEVELING INSPIRED SYSTEM UI
 /// ═══════════════════════════════════════════════════════════════════════════
@@ -27,7 +96,7 @@ import 'design_system.dart';
 /// - No glassmorphism
 /// - No heavy animations
 /// - No playful elements
-/// - Consistent BorderRadius: 14-18
+/// - Consistent BorderRadius: 16
 /// - Slight letter spacing for headings
 /// - Breathing room and spacing
 ///
@@ -44,29 +113,40 @@ class AppTheme {
   /// CORE COLOR PALETTE (EXACT HEX VALUES)
   /// ═══════════════════════════════════════════════════════════════════════
 
-  // Base Backgrounds - Deep black system
-  static const Color backgroundPrimary = Color(0xFF0A0F1C);    // Primary deep black
-  static const Color backgroundSurface = Color(0xFF121A2A);    // Surface cards
-  static const Color backgroundElevated = Color(0xFF182235);   // Elevated elements
+  // Base Backgrounds
+  static const Color backgroundPrimary = AppColors.backgroundPrimary;
+  static const Color backgroundSurface = AppColors.backgroundSurface;
+  static const Color backgroundElevated = AppColors.backgroundElevated;
 
-  // Primary Accent Blues - Cold neon system
-  static const Color neonBlue = Color(0xFF81D8F0);             // Light neon blue (glow lines)
-  static const Color deepBlue = Color(0xFF4DA6C5);             // Deep cyan-blue (active)
+  // Primary Accent Blues
+  static const Color neonBlue = AppColors.neonBlue;
+  static const Color deepBlue = AppColors.deepBlue;
 
-  // Blood Red - Intensity accent
-  static const Color bloodRed = Color(0xFF70020F);             // Primary red
-  static const Color bloodRedActive = Color(0xFF8C0A18);       // Active red state
+  // Deep Navies
+  static const Color navyDeep = AppColors.navyDeep;
+  static const Color navyDarker = AppColors.navyDarker;
 
-  // Royal Gold - Premium highlight (rare use only)
-  static const Color royalGold = Color(0xFFFFD700);            // Gold accent
+  // Blood Red
+  static const Color bloodRed = AppColors.bloodRed;
+  static const Color bloodRedActive = AppColors.bloodRedActive;
+
+  // Royal Gold
+  static const Color royalGold = AppColors.royalGold;
+  static const Color royalGoldDark = AppColors.royalGoldDark;
+
+  // Purple Accents
+  static const Color shadowPurple = AppColors.shadowPurple;
+  static const Color deepPurple = AppColors.deepPurple;
 
   // Text Hierarchy
-  static const Color textPrimary = Color(0xFFE6EDF3);          // Primary text
-  static const Color textSecondary = Color(0xFF9FB3C8);        // Secondary text
-  static const Color textMuted = Color(0xFF5C6B7A);            // Muted text
+  static const Color textPrimary = AppColors.textPrimary;
+  static const Color textSecondary = AppColors.textSecondary;
+  static const Color textMuted = AppColors.textMuted;
+  static const Color textHighlight = AppColors.textHighlight;
 
   // UI Elements
-  static const Color dividerColor = Color(0xFF1E293B);         // Dividers
+  static const Color dividerColor = AppColors.dividerColor;
+  static const Color glowEffect = AppColors.glowEffect;
 
   /// ═══════════════════════════════════════════════════════════════════════
   /// DOMAIN BAR COLORS - Multi-color histogram system
@@ -74,14 +154,7 @@ class AppTheme {
   /// Each domain gets a unique color from this cycle for visual distinction.
   /// Colors are carefully selected to maintain premium dark aesthetic.
 
-  static const List<Color> domainBarColors = [
-    Color(0xFF4DA6C5),   // Deep cyan-blue
-    Color(0xFF81D8F0),   // Light neon blue
-    Color(0xFF70020F),   // Blood red
-    Color(0xFFFFD700),   // Royal gold
-    Color(0xFF1F3A8A),   // Deep navy blue
-    Color(0xFF0F3460),   // Darker navy blue
-  ];
+  static const List<Color> domainBarColors = AppColors.domainBarColors;
 
   /// Get domain color by index (cycles through colors)
   static Color getDomainColor(int index) {
@@ -89,10 +162,23 @@ class AppTheme {
   }
 
   /// ═══════════════════════════════════════════════════════════════════════
-  /// GLOW EFFECTS - Subtle elevation system
+  /// GLOW EFFECTS - Igris-style elevation system
   /// ═══════════════════════════════════════════════════════════════════════
+  /// 
+  /// Igris prefers FLAT design (elevation: 0) with COLORED GLOWS for depth
+  /// instead of traditional Material shadows. This creates the mysterious,
+  /// cold, system-UI aesthetic.
+  /// 
+  /// Usage guidelines:
+  /// • blueGlowSubtle: Active/hover states, 90-99% progress
+  /// • blueGlowStrong: 100% completion, focused states
+  /// • redGlowSubtle: Warnings, errors, intensity indicators
+  /// • purpleGlowSubtle: Shadow/Igris-themed domains, transformation states
+  /// • purpleGlowStrong: Special achievements, rare effects
+  /// • goldGlow: Premium achievements (very rare)
+  /// • elevationShadow: Standard Material shadow (use sparingly)
 
-  /// Subtle blue glow for active/hover states
+  /// Subtle blue glow for active/hover states (90-99% progress)
   static List<BoxShadow> get blueGlowSubtle => [
     BoxShadow(
       color: neonBlue.withOpacity(0.35),
@@ -119,7 +205,43 @@ class AppTheme {
     ),
   ];
 
-  /// Default elevation shadow (no glow)
+  /// Subtle purple glow for shadow/Igris domains
+  static List<BoxShadow> get purpleGlowSubtle => [
+    BoxShadow(
+      color: shadowPurple.withOpacity(0.3),
+      blurRadius: 12,
+      spreadRadius: 1,
+    ),
+  ];
+
+  /// Strong purple glow for transformations/special states
+  static List<BoxShadow> get purpleGlowStrong => [
+    BoxShadow(
+      color: shadowPurple.withOpacity(0.5),
+      blurRadius: 16,
+      spreadRadius: 2,
+    ),
+  ];
+
+  /// Soft glow effect (multi-use overlay)
+  static List<BoxShadow> get softGlow => [
+    BoxShadow(
+      color: glowEffect.withOpacity(0.25),
+      blurRadius: 10,
+      spreadRadius: 1,
+    ),
+  ];
+
+  /// Gold glow for premium achievements (very rare)
+  static List<BoxShadow> get goldGlow => [
+    BoxShadow(
+      color: royalGold.withOpacity(0.4),
+      blurRadius: 14,
+      spreadRadius: 1,
+    ),
+  ];
+
+  /// Default elevation shadow (no glow) - use sparingly
   static List<BoxShadow> get elevationShadow => [
     BoxShadow(
       color: Colors.black.withOpacity(0.3),
@@ -150,7 +272,7 @@ class AppTheme {
 
         // Tertiary: Royal gold (rare use)
         tertiary: royalGold,
-        tertiaryContainer: Color(0xFFB8860B), // Darker gold
+        tertiaryContainer: royalGoldDark,
 
         // Surfaces
         surface: backgroundSurface,
@@ -438,24 +560,47 @@ class AppTheme {
 
 extension IgrisColors on ColorScheme {
   /// Blood red accent - Use sparingly for intensity
-  Color get bloodRed => const Color(0xFF70020F);
+  Color get bloodRed => AppTheme.bloodRed;
+
+  /// Active blood red
+  Color get bloodRedActive => AppTheme.bloodRedActive;
 
   /// Light neon blue - Glow lines and active states
-  Color get neonBlue => const Color(0xFF81D8F0);
+  Color get neonBlue => AppTheme.neonBlue;
 
   /// Deep cyan blue - Primary interactive elements
-  Color get deepBlue => const Color(0xFF4DA6C5);
+  Color get deepBlue => AppTheme.deepBlue;
 
   /// Royal gold - Premium highlights only (very rare)
-  Color get royalGold => const Color(0xFFFFD700);
+  Color get royalGold => AppTheme.royalGold;
+
+  /// Darker gold - container/highlight background
+  Color get royalGoldDark => AppTheme.royalGoldDark;
+
+  /// Purple accents
+  Color get shadowPurple => AppTheme.shadowPurple;
+  Color get deepPurple => AppTheme.deepPurple;
+  Color get glowEffect => AppTheme.glowEffect;
 
   /// Background colors
-  Color get backgroundPrimary => const Color(0xFF0A0F1C);
-  Color get backgroundSurface => const Color(0xFF121A2A);
-  Color get backgroundElevated => const Color(0xFF182235);
+  Color get backgroundPrimary => AppTheme.backgroundPrimary;
+  Color get backgroundSurface => AppTheme.backgroundSurface;
+  Color get backgroundElevated => AppTheme.backgroundElevated;
 
   /// Text colors
-  Color get textPrimary => const Color(0xFFE6EDF3);
-  Color get textSecondary => const Color(0xFF9FB3C8);
-  Color get textMuted => const Color(0xFF5C6B7A);
+  Color get textPrimary => AppTheme.textPrimary;
+  Color get textSecondary => AppTheme.textSecondary;
+  Color get textMuted => AppTheme.textMuted;
+
+  Color get textHighlight => AppTheme.textHighlight;
+  
+  /// Convenience getters for glow effects
+  List<BoxShadow> get blueGlowSubtle => AppTheme.blueGlowSubtle;
+  List<BoxShadow> get blueGlowStrong => AppTheme.blueGlowStrong;
+  List<BoxShadow> get redGlowSubtle => AppTheme.redGlowSubtle;
+  List<BoxShadow> get purpleGlowSubtle => AppTheme.purpleGlowSubtle;
+  List<BoxShadow> get purpleGlowStrong => AppTheme.purpleGlowStrong;
+  List<BoxShadow> get softGlow => AppTheme.softGlow;
+  List<BoxShadow> get goldGlow => AppTheme.goldGlow;
+  List<BoxShadow> get elevationShadow => AppTheme.elevationShadow;
 }

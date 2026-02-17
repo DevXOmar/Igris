@@ -6,9 +6,14 @@ import '../../providers/task_provider.dart';
 import '../../providers/domain_provider.dart';
 import '../../core/utils/date_utils.dart' as app_date_utils;
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/design_system.dart';
+import '../../widgets/layout/igris_screen_scaffold.dart';
+import '../../widgets/ui/igris_ui.dart';
 
-/// Calendar screen showing monthly view with task completion indicators
-/// Professional dark theme with controlled red accents
+/// Calendar screen with Igris UI integration
+/// - TableCalendar wrapped in IgrisCard
+/// - Today: neonBlue filled, Selected: bloodRed outline
+/// - Completed tasks grouped by domain with gold accents
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
 
@@ -22,14 +27,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Calendar'),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            TableCalendar(
+    return IgrisScreenScaffold(
+      title: 'Calendar',
+      applyPadding: false,
+      child: Column(
+        children: [
+          // Calendar wrapped in IgrisCard for consistent styling
+          Padding(
+            padding: DesignSystem.paddingAll16,
+            child: IgrisCard(
+              child: TableCalendar(
               firstDay: DateTime.utc(2024, 1, 1),
               lastDay: DateTime.utc(2030, 12, 31),
               focusedDay: _focusedDay,
@@ -43,21 +50,21 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 });
               },
               calendarStyle: CalendarStyle(
-                // Today decoration - deep blue circle
+                // Today: neonBlue filled circle (Igris primary accent)
                 todayDecoration: BoxDecoration(
-                  color: AppTheme.deepBlue,
+                  color: AppColors.neonBlue,
                   shape: BoxShape.circle,
                 ),
                 todayTextStyle: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontWeight: FontWeight.w600,
+                  color: AppColors.backgroundPrimary,
+                  fontWeight: FontWeight.bold,
                 ),
-                // Selected day - blood red outline
+                // Selected: bloodRed outline (not fill)
                 selectedDecoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: AppTheme.bloodRedActive,
-                    width: 2,
+                    color: AppColors.bloodRed,
+                    width: 2.5,
                   ),
                 ),
                 selectedTextStyle: const TextStyle(
@@ -74,14 +81,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 outsideTextStyle: TextStyle(
                   color: AppTheme.textMuted,
                 ),
-                // Marker (completion indicator)
-                markerDecoration: const BoxDecoration(
-                  color: AppTheme.bloodRedActive,
-                  shape: BoxShape.circle,
-                ),
+                // Marker removed - custom builder adds glowing dot
                 markersAlignment: Alignment.bottomCenter,
-                markerSize: 6,
-                markerMargin: const EdgeInsets.only(top: 4),
               ),
               headerStyle: const HeaderStyle(
                 formatButtonVisible: false,
@@ -112,6 +113,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 ),
               ),
               calendarBuilders: CalendarBuilders(
+                // Completed day: glowing neonBlue dot
                 markerBuilder: (context, date, events) {
                   final log = ref.read(dailyLogProvider.notifier).getLogForDate(date);
                   if (log != null && log.completedTaskIds.isNotEmpty) {
@@ -120,9 +122,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       child: Container(
                         width: 6,
                         height: 6,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.bloodRedActive,
+                        decoration: BoxDecoration(
+                          color: AppColors.neonBlue,
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.neonBlue.withOpacity(0.6),
+                              blurRadius: 4,
+                              spreadRadius: 1,
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -131,19 +140,24 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 },
               ),
             ),
-            const Divider(),
-            Expanded(
-              child: _selectedDay == null
-                  ? Center(
-                      child: Text(
-                        'Select a day to view details',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    )
-                  : _buildDayDetails(_selectedDay!),
             ),
-          ],
-        ),
+          ),
+          SizedBox(height: DesignSystem.spacing16),
+          // Day details section
+          Expanded(
+            child: _selectedDay == null
+                ? Center(
+                    child: Text(
+                      'Select a day to view completed tasks',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                  )
+                : _buildDayDetails(_selectedDay!),
+          ),
+        ],
       ),
     );
   }
@@ -155,89 +169,110 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final dateFormatted = app_date_utils.DateUtils.formatDateLong(day);
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: DesignSystem.paddingH16,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Date header with gold accent
           Text(
             dateFormatted,
-            style: Theme.of(context).textTheme.titleLarge,
+            style: TextStyle(
+              color: AppColors.gold,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+            ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: DesignSystem.spacing16),
+          
           if (log == null || log.completedTaskIds.isEmpty)
-            Text(
-              'No tasks completed on this day',
-              style: Theme.of(context).textTheme.bodyMedium,
+            Center(
+              child: Padding(
+                padding: DesignSystem.paddingAll24,
+                child: Text(
+                  'No tasks completed on this day',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
             )
           else
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle_outline,
-                        color: AppTheme.bloodRedActive,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Completed Tasks: ${log.completedTaskIds.length}',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (log.graceUsed) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.deepBlue.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AppTheme.deepBlue,
-                          width: 1,
-                        ),
-                      ),
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Completion summary card
+                    IgrisCard(
+                      variant: IgrisCardVariant.surface,
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.shield_outlined,
-                            size: 18,
-                            color: AppTheme.deepBlue,
+                            Icons.check_circle_outline,
+                            color: AppColors.neonBlue,
+                            size: 24,
                           ),
-                          const SizedBox(width: 6),
+                          SizedBox(width: DesignSystem.spacing12),
                           Text(
-                            'Grace token used',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.deepBlue,
-                              fontWeight: FontWeight.w500,
+                            'Completed Tasks: ${log.completedTaskIds.length}',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Progress by Domain',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    
+                    // Grace token display
+                    if (log.graceUsed) ...[
+                      SizedBox(height: DesignSystem.spacing12),
+                      IgrisCard(
+                        variant: IgrisCardVariant.elevated,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.shield_outlined,
+                              size: 20,
+                              color: AppColors.deepBlue,
+                            ),
+                            SizedBox(width: DesignSystem.spacing8),
+                            Text(
+                              'Grace token used',
+                              style: TextStyle(
+                                color: AppColors.deepBlue,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    
+                    SizedBox(height: DesignSystem.spacing24),
+                    
+                    // Domain section header with gold accent
+                    Text(
+                      'Progress by Domain',
+                      style: TextStyle(
+                        color: AppColors.gold,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  // List of domains with progress
-                  Expanded(
-                    child: _buildDomainProgressList(log, taskState, domainState),
-                  ),
-                ],
+                    SizedBox(height: DesignSystem.spacing16),
+                    
+                    // List of domains with progress
+                    _buildDomainProgressList(log, taskState, domainState),
+                  ],
+                ),
               ),
             ),
         ],
@@ -267,12 +302,22 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         .toList();
     
     if (domainsWithTasks.isEmpty) {
-      return const Center(
-        child: Text('No domain data available'),
+      return Center(
+        child: Padding(
+          padding: DesignSystem.paddingAll24,
+          child: Text(
+            'No domain data available',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ),
       );
     }
     
     return ListView.builder(
+      shrinkWrap: true,
       physics: const ClampingScrollPhysics(),
       itemCount: domainsWithTasks.length,
       itemBuilder: (context, index) {
@@ -282,10 +327,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         final completedCount = completedTaskIds.length;
         final progress = totalDomainTasks > 0 ? completedCount / totalDomainTasks : 0.0;
         
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
+        return Padding(
+          padding: EdgeInsets.only(bottom: DesignSystem.spacing12),
+          child: IgrisCard(
+            variant: IgrisCardVariant.elevated,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -295,23 +340,26 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     Expanded(
                       child: Text(
                         domain.name,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: DesignSystem.spacing12,
+                        vertical: DesignSystem.spacing8,
                       ),
                       decoration: BoxDecoration(
                         color: progress == 1.0
-                            ? AppTheme.bloodRed.withValues(alpha: 0.2)
-                            : AppTheme.deepBlue.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
+                            ? AppColors.bloodRed.withValues(alpha: 0.15)
+                            : AppColors.neonBlue.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: progress == 1.0 ? AppTheme.bloodRed : AppTheme.deepBlue,
+                          color: progress == 1.0 ? AppColors.bloodRed : AppColors.neonBlue,
                           width: 1,
                         ),
                       ),
@@ -321,22 +369,22 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                           letterSpacing: 0.5,
-                          color: progress == 1.0 ? AppTheme.bloodRedActive : AppTheme.deepBlue,
+                          color: progress == 1.0 ? AppColors.bloodRed : AppColors.neonBlue,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                // Progress bar with theme colors
+                SizedBox(height: DesignSystem.spacing12),
+                // Progress bar with Igris colors
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
                     value: progress,
                     minHeight: 10,
-                    backgroundColor: AppTheme.backgroundElevated,
+                    backgroundColor: AppColors.backgroundElevated,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      progress == 1.0 ? AppTheme.bloodRedActive : AppTheme.deepBlue,
+                      progress == 1.0 ? AppColors.bloodRed : AppColors.neonBlue,
                     ),
                   ),
                 ),

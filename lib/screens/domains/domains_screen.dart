@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/theme/design_system.dart';
 import '../../providers/domain_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../models/domain.dart';
 import '../../models/task.dart';
+import '../../widgets/ui/igris_ui.dart';
+import '../../widgets/layout/igris_screen_scaffold.dart';
 
 /// Domains screen for managing life domains and their tasks
-/// Users can create, edit domains and add tasks to each domain
+/// Refactored with Igris UI components for consistent styling
 class DomainsScreen extends ConsumerWidget {
   const DomainsScreen({super.key});
 
@@ -16,11 +20,16 @@ class DomainsScreen extends ConsumerWidget {
     final domainState = ref.watch(domainProvider);
     final taskState = ref.watch(taskProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Domains'),
-      ),
-      body: domainState.domains.isEmpty
+    return IgrisScreenScaffold(
+      title: 'Domains',
+      applyPadding: false,
+      actions: [
+        IconButton(
+          onPressed: () => _showAddDomainDialog(context, ref),
+          icon: Icon(Icons.add, color: AppColors.neonBlue, size: 24),
+        ),
+      ],
+      child: domainState.domains.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -28,175 +37,233 @@ class DomainsScreen extends ConsumerWidget {
                   Icon(
                     Icons.dashboard,
                     size: 64,
-                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                    color: AppColors.textSecondary,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: DesignSystem.spacing16),
                   Text(
                     'No domains yet',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: DesignSystem.spacing8),
                   Text(
                     'Create a domain to get started',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
             )
           : ListView.builder(
               physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.all(16),
+              padding: DesignSystem.paddingAll16,
               itemCount: domainState.domains.length,
               itemBuilder: (context, index) {
                 final domain = domainState.domains[index];
                 final domainTasks = taskState.getTasksByDomain(domain.id);
+                final weeklyScore = (domain.strength / 100.0).clamp(0.0, 1.0);
+                final shouldGlow = weeklyScore >= 0.90;
                 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: ExpansionTile(
-                    title: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            domain.name,
-                            style: Theme.of(context).textTheme.titleLarge,
+                return Padding(
+                  padding: EdgeInsets.only(bottom: DesignSystem.spacing16),
+                  child: IgrisCard(
+                    variant: IgrisCardVariant.elevated,
+                    showGlow: shouldGlow,
+                    child: ExpansionTile(
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              domain.name,
+                              style: TextStyle(
+                                color: AppColors.gold,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
                           ),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: DesignSystem.spacing12,
+                              vertical: DesignSystem.spacing8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.neonBlue.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: AppColors.neonBlue,
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              'Strength: ${domain.strength}',
+                              style: TextStyle(
+                                color: AppColors.neonBlue,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      subtitle: Padding(
+                        padding: EdgeInsets.only(top: DesignSystem.spacing4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              domain.isActive ? Icons.check_circle : Icons.cancel,
+                              size: 14,
+                              color: domain.isActive 
+                                  ? AppColors.neonBlue
+                                  : AppColors.textMuted,
+                            ),
+                            SizedBox(width: DesignSystem.spacing4),
+                            Text(
+                              domain.isActive ? 'Active' : 'Inactive',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 14,
+                              ),
+                            ),
+                            SizedBox(width: DesignSystem.spacing16),
+                            Text(
+                              '${domainTasks.length} tasks',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'Strength: ${domain.strength}',
-                            style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      children: [
+                        Divider(height: 1, color: AppColors.neonBlue.withValues(alpha: 0.2)),
+                        // Domain actions
+                        Padding(
+                          padding: DesignSystem.paddingAll16,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Toggle active button
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: IgrisButton(
+                                      onPressed: () {
+                                        ref.read(domainProvider.notifier)
+                                            .toggleDomainActive(domain.id);
+                                      },
+                                      variant: IgrisButtonVariant.outline,
+                                      text: domain.isActive ? 'Deactivate' : 'Activate',
+                                      icon: domain.isActive ? Icons.pause : Icons.play_arrow,
+                                    ),
+                                  ),
+                                  SizedBox(width: DesignSystem.spacing8),
+                                  Expanded(
+                                    child: IgrisButton(
+                                      onPressed: () => _showDeleteDomainDialog(context, ref, domain),
+                                      variant: IgrisButtonVariant.destructive,
+                                      text: 'Delete',
+                                      icon: Icons.delete,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: DesignSystem.spacing16),
+                              // Tasks list
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Tasks',
+                                    style: TextStyle(
+                                      color: AppColors.gold,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  IgrisButton(
+                                    onPressed: () => _showAddTaskDialog(context, ref, domain),
+                                    variant: IgrisButtonVariant.ghost,
+                                    text: 'Add Task',
+                                    icon: Icons.add,
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: DesignSystem.spacing8),
+                              if (domainTasks.isEmpty)
+                                Text(
+                                  'No tasks yet',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 14,
+                                  ),
+                                )
+                              else
+                                ...domainTasks.map((task) => ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text(
+                                        task.title,
+                                        style: TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (task.isRecurring)
+                                            Container(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: DesignSystem.spacing8,
+                                                vertical: DesignSystem.spacing4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.neonBlue.withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: AppColors.neonBlue,
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                'Recurring',
+                                                style: TextStyle(
+                                                  color: AppColors.neonBlue,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          SizedBox(width: DesignSystem.spacing8),
+                                          IconButton(
+                                            icon: Icon(
+                                              Icons.delete_outline,
+                                              color: AppColors.bloodRed,
+                                              size: 20,
+                                            ),
+                                            onPressed: () => _showDeleteTaskDialog(context, ref, task),
+                                          ),
+                                        ],
+                                      ),
+                                    )),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Row(
-                        children: [
-                          Icon(
-                            domain.isActive ? Icons.check_circle : Icons.cancel,
-                            size: 14,
-                            color: domain.isActive 
-                                ? Theme.of(context).colorScheme.secondary
-                                : Theme.of(context).textTheme.bodyMedium?.color,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            domain.isActive ? 'Active' : 'Inactive',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(width: 16),
-                          Text(
-                            '${domainTasks.length} tasks',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ],
-                      ),
-                    ),
-                    children: [
-                      const Divider(height: 1),
-                      // Domain actions
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Toggle active button
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {
-                                      ref.read(domainProvider.notifier)
-                                          .toggleDomainActive(domain.id);
-                                    },
-                                    icon: Icon(domain.isActive ? Icons.pause : Icons.play_arrow),
-                                    label: Text(domain.isActive ? 'Deactivate' : 'Activate'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () => _showDeleteDomainDialog(context, ref, domain),
-                                    icon: const Icon(Icons.delete),
-                                    label: const Text('Delete'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            // Tasks list
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Tasks',
-                                  style: Theme.of(context).textTheme.titleMedium,
-                                ),
-                                TextButton.icon(
-                                  onPressed: () => _showAddTaskDialog(context, ref, domain),
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Add Task'),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            if (domainTasks.isEmpty)
-                              Text(
-                                'No tasks yet',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              )
-                            else
-                              ...domainTasks.map((task) => ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text(task.title),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (task.isRecurring)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.2),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              'Recurring',
-                                              style: Theme.of(context).textTheme.bodySmall,
-                                            ),
-                                          ),
-                                        const SizedBox(width: 8),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_outline),
-                                          onPressed: () => _showDeleteTaskDialog(context, ref, task),
-                                        ),
-                                      ],
-                                    ),
-                                  )),
-                          ],
-                        ),
-                      ),
-                    ],
                   ),
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddDomainDialog(context, ref),
-        child: const Icon(Icons.add),
-      ),
     );
   }
 

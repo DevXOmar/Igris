@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/theme/design_system.dart';
 import '../../providers/grace_provider.dart';
 import '../../providers/domain_provider.dart';
 import '../../providers/task_provider.dart';
-import '../../core/utils/date_utils.dart' as app_date_utils;
+import '../../widgets/ui/igris_ui.dart';
+import '../../widgets/layout/igris_screen_scaffold.dart';
 
 /// Settings screen for app configuration and grace token management
+/// Refactored with Igris UI components for consistent styling
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -17,18 +21,18 @@ class SettingsScreen extends ConsumerWidget {
     
     final daysUntilReset = ref.read(graceProvider.notifier).getDaysUntilReset();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
-      body: ListView(
+    return IgrisScreenScaffold(
+      title: 'Settings',
+      applyPadding: false,
+      child: ListView(
         physics: const ClampingScrollPhysics(),
-        padding: const EdgeInsets.all(16),
+        padding: DesignSystem.paddingAll16,
         children: [
           // Grace System Section
-          Card(
+          IgrisCard(
+            variant: IgrisCardVariant.elevated,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: DesignSystem.paddingAll16,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -36,53 +40,60 @@ class SettingsScreen extends ConsumerWidget {
                     children: [
                       Icon(
                         Icons.shield,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: AppColors.gold,
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: DesignSystem.spacing8),
                       Text(
                         'Grace System',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: const TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: DesignSystem.spacing16),
                   _buildInfoRow(
                     context,
                     'Weekly Grace Tokens',
                     '${graceState.weeklyGraceLeft} / ${graceState.maxGraceTokens}',
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: DesignSystem.spacing8),
                   _buildInfoRow(
                     context,
                     'Days Until Reset',
                     '$daysUntilReset days',
                   ),
-                  if (graceState.lastResetDate != null) ...[
-                    const SizedBox(height: 8),
+                  if (graceState.lastResetDate != null) ...
+                    [
+                    SizedBox(height: DesignSystem.spacing8),
                     _buildInfoRow(
                       context,
                       'Last Reset',
-                      app_date_utils.DateUtils.formatDateShort(graceState.lastResetDate!),
+                      '${graceState.lastResetDate?.day}/${graceState.lastResetDate?.month}/${graceState.lastResetDate?.year}',
                     ),
                   ],
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  Text(
+                  SizedBox(height: DesignSystem.spacing16),
+                  Divider(color: AppColors.neonBlue.withValues(alpha: 0.2)),
+                  SizedBox(height: DesignSystem.spacing8),
+                  const Text(
                     'Grace tokens allow you to skip a day without breaking your streak. They reset every week.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: TextStyle(color: AppColors.textSecondary),
                   ),
                 ],
               ),
             ),
           ),
           
-          const SizedBox(height: 16),
+          SizedBox(height: DesignSystem.spacing16),
           
           // Statistics Section
-          Card(
+          IgrisCard(
+            variant: IgrisCardVariant.elevated,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: DesignSystem.paddingAll16,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -90,34 +101,39 @@ class SettingsScreen extends ConsumerWidget {
                     children: [
                       Icon(
                         Icons.analytics,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: AppColors.gold,
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: DesignSystem.spacing8),
                       Text(
                         'Statistics',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: const TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: DesignSystem.spacing16),
                   _buildInfoRow(
                     context,
                     'Total Domains',
                     '${domainState.domains.length}',
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: DesignSystem.spacing8),
                   _buildInfoRow(
                     context,
                     'Active Domains',
                     '${domainState.activeDomains.length}',
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: DesignSystem.spacing8),
                   _buildInfoRow(
                     context,
                     'Total Tasks',
                     '${taskState.tasks.length}',
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: DesignSystem.spacing8),
                   _buildInfoRow(
                     context,
                     'Recurring Tasks',
@@ -128,12 +144,13 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           
-          const SizedBox(height: 16),
+          SizedBox(height: DesignSystem.spacing16),
           
           // Domain Strengths Section
-          Card(
+          IgrisCard(
+            variant: IgrisCardVariant.elevated,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: DesignSystem.paddingAll16,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -141,20 +158,25 @@ class SettingsScreen extends ConsumerWidget {
                     children: [
                       Icon(
                         Icons.trending_up,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: AppColors.gold,
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: DesignSystem.spacing8),
                       Text(
                         'Domain Strengths',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: const TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: DesignSystem.spacing16),
                   if (domainState.domains.isEmpty)
-                    Text(
+                    const Text(
                       'No domains yet',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      style: TextStyle(color: AppColors.textSecondary),
                     )
                   else
                     ...domainState.domains.map((domain) => Padding(
@@ -170,12 +192,13 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           
-          const SizedBox(height: 16),
+          SizedBox(height: DesignSystem.spacing16),
           
           // App Info Section
-          Card(
+          IgrisCard(
+            variant: IgrisCardVariant.elevated,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: DesignSystem.paddingAll16,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -183,25 +206,30 @@ class SettingsScreen extends ConsumerWidget {
                     children: [
                       Icon(
                         Icons.info_outline,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: AppColors.gold,
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: DesignSystem.spacing8),
                       Text(
                         'About',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: const TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: DesignSystem.spacing16),
                   _buildInfoRow(context, 'App Name', 'Igris'),
-                  const SizedBox(height: 8),
+                  SizedBox(height: DesignSystem.spacing8),
                   _buildInfoRow(context, 'Version', '1.0.0'),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  Text(
+                  SizedBox(height: DesignSystem.spacing16),
+                  Divider(color: AppColors.neonBlue.withValues(alpha: 0.2)),
+                  SizedBox(height: DesignSystem.spacing8),
+                  const Text(
                     'A personal productivity and identity-tracking app.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: TextStyle(color: AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -218,14 +246,14 @@ class SettingsScreen extends ConsumerWidget {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.bodyLarge,
+          style: const TextStyle(color: AppColors.textPrimary),
         ),
         Text(
           value,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.neonBlue,
+          ),
         ),
       ],
     );

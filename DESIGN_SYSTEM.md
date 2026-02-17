@@ -171,15 +171,116 @@ DesignSystem.borderThick   // 3px - Strong borders (rare)
 
 ---
 
-## 🏔️ Elevation Levels
+## 🏔️ Elevation & Glow System
+
+**Igris Philosophy:** Prefer **FLAT (elevation: 0) + COLORED GLOWS** over traditional Material shadows for the cold, mysterious system-UI aesthetic.
+
+### Elevation Levels
 
 ```dart
-DesignSystem.elevation0  // 0  - Flat elements
-DesignSystem.elevation1  // 1  - Subtle elevation
-DesignSystem.elevation2  // 2  - Card elevation
-DesignSystem.elevation4  // 4  - Floating elements
-DesignSystem.elevation8  // 8  - Dialogs, modals
+DesignSystem.elevation0  // 0dp - Flat elements (DEFAULT)
+DesignSystem.elevation1  // 1dp - Subtle lift (rare)
+DesignSystem.elevation2  // 2dp - Standard elevation (rare)
+DesignSystem.elevation4  // 4dp - Floating elements (FAB)
+DesignSystem.elevation8  // 8dp - Modals, dialogs
 ```
+
+### When to Use Each Level
+
+**elevation0 (Flat - Default)**
+- ✅ Cards (use borders instead)
+- ✅ Buttons (use glow effects)
+- ✅ List items
+- ✅ Most UI elements
+
+**elevation1 (Subtle)**
+- ⚠️ Hover states (prefer glows)
+- ⚠️ Nested cards (rare)
+
+**elevation2 (Standard)**
+- ⚠️ Resting cards (if needed)
+- ⚠️ App bar (if not transparent)
+
+**elevation4 (Floating)**
+- ✅ Floating Action Button
+- ✅ Active dragged elements
+
+**elevation8 (Modal)**
+- ✅ Dialogs
+- ✅ Modal bottom sheets
+- ✅ Dropdown menus
+- ✅ Navigation drawer
+
+### Glow Effects (Preferred over shadows)
+
+```dart
+// Blue glows - Progress & completion
+AppTheme.blueGlowSubtle   // Active/hover, 90-99% progress
+AppTheme.blueGlowStrong   // 100% completion, focused states
+
+// Red glows - Warnings & intensity
+AppTheme.redGlowSubtle    // Warnings, errors, intensity
+
+// Purple glows - Shadow/Igris themes
+AppTheme.purpleGlowSubtle   // Shadow domains, Igris elements
+AppTheme.purpleGlowStrong   // Transformations, special states
+AppTheme.softGlow           // Generic soft purple glow
+
+// Gold glow - Premium (VERY RARE)
+AppTheme.goldGlow         // Achievements, rare excellence
+
+// Standard shadow (use sparingly)
+AppTheme.elevationShadow  // Traditional Material shadow
+```
+
+### Usage Examples
+
+```dart
+// ✅ CORRECT - Flat with glow
+Container(
+  decoration: BoxDecoration(
+    color: AppTheme.backgroundSurface,
+    borderRadius: DesignSystem.radiusStandard,
+    boxShadow: AppTheme.blueGlowSubtle, // Glow instead of elevation
+  ),
+)
+
+// ✅ CORRECT - Progress-based glow
+Container(
+  decoration: BoxDecoration(
+    boxShadow: progress >= 1.0 
+      ? AppTheme.blueGlowStrong 
+      : progress >= 0.9 
+        ? AppTheme.blueGlowSubtle 
+        : AppTheme.elevationShadow,
+  ),
+)
+
+// ❌ WRONG - Don't use Material elevation property
+Card(
+  elevation: 4, // Don't do this
+  child: ...
+)
+
+// ✅ CORRECT - Use elevation property but with value 0
+Card(
+  elevation: DesignSystem.elevation0, // Flat
+  child: ...
+)
+```
+
+### Glow Selection Guide
+
+| Use Case | Glow Effect |
+|----------|-------------|
+| Progress 90-99% | `blueGlowSubtle` |
+| Progress 100% | `blueGlowStrong` |
+| Hover/Active state | `blueGlowSubtle` |
+| Error/Warning | `redGlowSubtle` |
+| Shadow domain | `purpleGlowSubtle` |
+| Transformation | `purpleGlowStrong` |
+| Achievement | `goldGlow` |
+| Default/Neutral | `elevationShadow` |
 
 ---
 
