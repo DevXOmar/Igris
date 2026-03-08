@@ -5,6 +5,8 @@ import 'core/theme/app_theme.dart';
 import 'models/domain.dart';
 import 'models/task.dart';
 import 'models/daily_log.dart';
+import 'models/fuel_vault_entry.dart';
+import 'models/rival.dart';
 import 'screens/home/home_screen.dart';
 
 class _AppScrollBehavior extends MaterialScrollBehavior {
@@ -38,11 +40,15 @@ void main() async {
   Hive.registerAdapter(DomainAdapter());
   Hive.registerAdapter(TaskAdapter());
   Hive.registerAdapter(DailyLogAdapter());
+  Hive.registerAdapter(FuelVaultEntryAdapter());
+  Hive.registerAdapter(RivalAdapter());
   
   // Open Hive Boxes
   await Hive.openBox<Domain>('domainsBox');
   await Hive.openBox<Task>('tasksBox');
   await Hive.openBox<DailyLog>('dailyLogsBox');
+  await Hive.openBox<FuelVaultEntry>('fuelVaultBox');
+  await Hive.openBox<Rival>('rivalsBox');
   await Hive.openBox('settingsBox');
   
   runApp(

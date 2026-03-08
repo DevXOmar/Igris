@@ -43,6 +43,9 @@ class NavigationNotifier extends Notifier<NavigationState> {
   
   /// Navigate to settings screen
   void goToSettings() => setIndex(3);
+
+  /// Navigate to rival board screen
+  void goToRivalBoard() => setIndex(4);
 }
 
 /// Global provider for navigation state

@@ -7,6 +7,7 @@ import '../../core/theme/design_system.dart';
 import '../../widgets/grace_tokens_display.dart';
 import '../../widgets/domain_progress_bar.dart';
 import '../../widgets/domain_tasks_bottom_sheet.dart';
+import '../fuel_vault/vault_auth_screen.dart';
 
 /// Home content showing weekly cumulative progress per domain as horizontal bars
 /// 
@@ -177,16 +178,20 @@ class HomeContent extends ConsumerWidget {
             
             // Progress bars list
             domains.isEmpty
-                ? SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _buildEmptyState(context),
+                ? SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        vertical: DesignSystem.spacing24,
+                      ),
+                      child: _buildEmptyState(context),
+                    ),
                   )
                 : SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final domain = domains[index];
                         final progress = weeklyStats.weeklyProgress[domain] ?? 0.0;
-                        
+
                         return Padding(
                           padding: EdgeInsets.fromLTRB(
                             DesignSystem.spacing16,
@@ -207,6 +212,73 @@ class HomeContent extends ConsumerWidget {
                       childCount: domains.length,
                     ),
                   ),
+
+            // Fuel Vault locked indicator card
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  DesignSystem.spacing16,
+                  DesignSystem.spacing16,
+                  DesignSystem.spacing16,
+                  DesignSystem.spacing16,
+                ),
+                child: InkWell(
+                  borderRadius: DesignSystem.radiusStandard,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const VaultAuthScreen(),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: DesignSystem.paddingAll16,
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundElevated,
+                      borderRadius: DesignSystem.radiusStandard,
+                      border: Border.all(
+                        color: AppColors.neonBlue.withValues(alpha: 0.2),
+                        width: DesignSystem.borderThin,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.lock_outline,
+                          color: AppColors.neonBlue,
+                          size: 22,
+                        ),
+                        SizedBox(width: DesignSystem.spacing12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Fuel Vault',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Tap to unlock your private vault',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppColors.textMuted,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: AppColors.textMuted,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -299,3 +371,5 @@ class HomeContent extends ConsumerWidget {
     );
   }
 }
+
+

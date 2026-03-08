@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/navigation_provider.dart';
 import '../calendar/calendar_screen.dart';
 import '../domains/domains_screen.dart';
+import '../rival_board/rival_board_screen.dart';
 import '../settings/settings_screen.dart';
 import 'home_content.dart';
 
@@ -61,6 +62,10 @@ class HomeScreen extends ConsumerWidget {
               icon: Icon(Icons.settings),
               label: 'Settings',
             ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.radar),
+              label: 'Rivals',
+            ),
           ],
         ),
       ),
@@ -77,6 +82,8 @@ class HomeScreen extends ConsumerWidget {
         return const DomainsScreen();
       case 3:
         return const SettingsScreen();
+      case 4:
+        return const RivalBoardScreen();
       default:
         return const HomeContent();
     }
