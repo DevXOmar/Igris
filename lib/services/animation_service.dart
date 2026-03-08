@@ -39,9 +39,13 @@ class AnimationTrigger {
   final AnimationEvent event;
   final int version;
 
+  /// The new level number — only meaningful for [AnimationEvent.levelUp].
+  final int level;
+
   const AnimationTrigger({
     this.event = AnimationEvent.none,
     this.version = 0,
+    this.level = 0,
   });
 
   bool get isActive => event != AnimationEvent.none;
@@ -67,8 +71,13 @@ class AnimationService extends Notifier<AnimationTrigger> {
   AnimationTrigger build() => const AnimationTrigger();
 
   /// Level increased — gold glow hero animation + confetti.
-  void onLevelUp() =>
-      state = AnimationTrigger(event: AnimationEvent.levelUp, version: ++_version);
+  ///
+  /// Pass [level] so the overlay can display "LEVEL X ACHIEVED".
+  void onLevelUp([int level = 1]) => state = AnimationTrigger(
+        event: AnimationEvent.levelUp,
+        version: ++_version,
+        level: level,
+      );
 
   /// All tasks in a domain completed today — neon quest overlay.
   void onQuestComplete() =>

@@ -85,13 +85,13 @@ class _AnimationLayer extends StatelessWidget {
     switch (event) {
       // ── Major system events ───────────────────────────────────────────────
       // Hero Rive animation (gold-glow fallback) + palette confetti burst.
-      // SystemLevelUpAnimation drives the dismiss timing (2.5 s / 1.8 s).
+      // LevelUpOverlay drives the dismiss timing (3.2 s Rive / 2.6 s fallback).
       // Confetti runs for 1.4 s, settles, then completes silently.
       case AnimationEvent.levelUp:
       case AnimationEvent.domainUnlocked:
         return Stack(
           children: [
-            SystemLevelUpAnimation(onComplete: onComplete),
+            LevelUpOverlay(newLevel: trigger.level, onComplete: onComplete),
             AchievementConfettiWidget(onComplete: () {}),
           ],
         );

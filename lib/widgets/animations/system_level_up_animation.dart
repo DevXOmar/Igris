@@ -1,47 +1,59 @@
+// ignore_for_file: unused_import
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:rive/rive.dart';
 
 import '../../core/theme/app_theme.dart';
 
-/// Overlay animation for major Igris system events: level-up, domain-unlock.
+// ── Auto-dismiss timing ──────────────────────────────────────────────────────
+const _kRiveDuration = Duration(milliseconds: 3200);
+const _kFadeOut = Duration(milliseconds: 400);
+const _kFallbackDuration = Duration(milliseconds: 2600);
+
+/// Full-screen overlay shown when the hunter's level increases.
 ///
-/// ── Asset path ──────────────────────────────────────────────────────────────
-///   assets/rive/level_up_system.riv
+/// ── Asset: assets/rive/level_up_shadow.riv ──────────────────────────────────
+///   StateMachine : 'LevelMachine'
+///   SMI inputs   : 'level'  (Number)  — drives visual intensity
+///                  'rankUp' (Trigger) — starts the shadow-rise sequence
 ///
-///   The .riv file should contain either:
-///   • A StateMachine named "LevelUp" (preferred — allows input control), or
-///   • A simple animation named "Animation 1" as a one-shot fallback.
+/// ── Behaviour ───────────────────────────────────────────────────────────────
+///   1. Dark scrim fades in (70 % opacity).
+///   2. Rive artboard loads; 'level' input is set; 'rankUp' fires.
+///   3. "SYSTEM UPDATE" + "LEVEL X ACHIEVED" text block animates in.
+///   4. After [_kRiveDuration] the whole overlay fades out and [onComplete]
+///      is called exactly once.
 ///
-/// ── Graceful fallback ───────────────────────────────────────────────────────
-///   If the .riv asset is absent, empty, or fails to parse, a pure
-///   flutter_animate fallback renders instead: an expanding gold ring +
-///   "LEVEL UP / SYSTEM RESPONSE" text with glow. The visual language matches
-///   the Igris dark palette and feels like a system notification, not a game.
-///
-/// ── Dismissal ───────────────────────────────────────────────────────────────
-///   [onComplete] is called after 2.5 s (Rive) or 1.8 s (fallback).
-///   The [AnimationOverlay] uses this to remove the layer from the Stack.
-///
-/// No interaction is possible while the overlay is visible ([IgnorePointer]).
-class SystemLevelUpAnimation extends StatefulWidget {
+/// Wrapped in [IgnorePointer] — no user interaction while visible.
+class LevelUpOverlay extends StatefulWidget {
+  final int newLevel;
   final VoidCallback onComplete;
 
-  const SystemLevelUpAnimation({super.key, required this.onComplete});
+  const LevelUpOverlay({
+    super.key,
+    required this.newLevel,
+    required this.onComplete,
+  });
 
   @override
-  State<SystemLevelUpAnimation> createState() => _SystemLevelUpAnimationState();
+  State<LevelUpOverlay> createState() => _LevelUpOverlayState();
 }
 
-class _SystemLevelUpAnimationState extends State<SystemLevelUpAnimation> {
-  // Whether the Rive file loaded successfully
+class _LevelUpOverlayState extends State<LevelUpOverlay> {
+  // ── Rive state ─────────────────────────────────────────────────────────────
+  StateMachineController? _controller;
+  SMINumber? _levelInput;
+  SMITrigger? _rankUpTrigger;
+  Artboard? _artboard;
+
+  // ── Overlay state ──────────────────────────────────────────────────────────
   bool _riveLoaded = false;
-  // Whether we gave up on Rive and switched to fallback
   bool _useFallback = false;
-  // Guard: fire onComplete exactly once
+  bool _dismissing = false;
   bool _completed = false;
 
-  Artboard? _artboard;
+  // ── Rive animation size (dp) ───────────────────────────────────────────────
+  static const double _riveSize = 260;
 
   @override
   void initState() {
@@ -49,17 +61,25 @@ class _SystemLevelUpAnimationState extends State<SystemLevelUpAnimation> {
     _loadRive();
   }
 
+  // ── Load Rive ──────────────────────────────────────────────────────────────
+
   Future<void> _loadRive() async {
     try {
-      final file = await RiveFile.asset('assets/rive/level_up_system.riv');
+      final file = await RiveFile.asset('assets/rive/level_up_shadow.riv');
       final artboard = file.mainArtboard.instance();
 
-      // Prefer a StateMachine named "LevelUp"; fall back to any simple animation
-      final smCtrl = StateMachineController.fromArtboard(artboard, 'LevelUp');
-      if (smCtrl != null) {
-        artboard.addController(smCtrl);
-        smCtrl.isActive = true;
+      // Null-safe: only assign if the StateMachine exists in this .riv file.
+      final controller =
+          StateMachineController.fromArtboard(artboard, 'LevelMachine');
+      if (controller != null) {
+        artboard.addController(controller);
+        _controller = controller;
+        _levelInput =
+            controller.findInput<double>('level') as SMINumber?;
+        _rankUpTrigger =
+            controller.findInput<bool>('rankUp') as SMITrigger?;
       } else {
+        // StateMachine absent — run first available simple animation.
         artboard.addController(SimpleAnimation('Animation 1', autoplay: true));
       }
 
@@ -69,15 +89,27 @@ class _SystemLevelUpAnimationState extends State<SystemLevelUpAnimation> {
         _riveLoaded = true;
       });
 
-      // Auto-dismiss after 2.5 s regardless of artboard animation length
-      Future.delayed(const Duration(milliseconds: 2500), _finish);
+      // Fire inputs after the first rendered frame so the artboard is ready.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _levelInput?.value = widget.newLevel.toDouble();
+        _rankUpTrigger?.fire();
+      });
+
+      Future.delayed(_kRiveDuration, _startDismiss);
     } catch (_) {
-      // .riv not present, not a valid Rive file, or asset not bundled yet —
-      // fall through to the flutter_animate gold-glow implementation.
+      // .riv missing, empty, or not a valid Rive file — use fallback.
       if (!mounted) return;
       setState(() => _useFallback = true);
-      Future.delayed(const Duration(milliseconds: 1800), _finish);
+      Future.delayed(_kFallbackDuration, _startDismiss);
     }
+  }
+
+  // ── Dismissal ──────────────────────────────────────────────────────────────
+
+  void _startDismiss() {
+    if (_completed || !mounted) return;
+    setState(() => _dismissing = true);
+    Future.delayed(_kFadeOut, _finish);
   }
 
   void _finish() {
@@ -86,145 +118,174 @@ class _SystemLevelUpAnimationState extends State<SystemLevelUpAnimation> {
     widget.onComplete();
   }
 
+  // ── Disposal ───────────────────────────────────────────────────────────────
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    // Still loading — show nothing (avoids flash before the animation starts)
+    // Nothing to show yet — avoid any flash before the animation is ready.
     if (!_riveLoaded && !_useFallback) return const SizedBox.expand();
 
-    if (_riveLoaded && _artboard != null) {
-      // ── Rive path ───────────────────────────────────────────────────────
-      return IgnorePointer(
-        child: Rive(artboard: _artboard!, fit: BoxFit.contain)
-            .animate()
-            .fadeIn(duration: 200.ms)
-            .then(delay: 2000.ms)
-            .fadeOut(duration: 300.ms),
-      );
-    }
-
-    // ── Flutter-Animate fallback (gold system pulse) ─────────────────────
-    return const _LevelUpFallback();
-  }
-}
-
-// ─── Flutter-Animate fallback ────────────────────────────────────────────────
-// Shown when the Rive asset is absent. Feels like a "system notification":
-//
-//   1. Subtle dark flash (fade in / out)
-//   2. Expanding gold ring with glow
-//   3. "LEVEL UP" text scales in from centre
-//   4. "SYSTEM RESPONSE" subtitle fades below
-//
-// All timing is below 1.8 s total so onComplete fires promptly after.
-class _LevelUpFallback extends StatelessWidget {
-  const _LevelUpFallback();
-
-  @override
-  Widget build(BuildContext context) {
     return IgnorePointer(
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // ── Dim overlay ─────────────────────────────────────────────────
-          // A brief darkening of the screen signals system takeover.
-          Container()
-              .animate()
-              .custom(
-                duration: 250.ms,
-                builder: (_, value, child) => Container(
-                  color: Colors.black.withValues(alpha: value * 0.40),
-                  child: child,
-                ),
-              )
-              .then(delay: 900.ms)
-              .custom(
-                duration: 500.ms,
-                builder: (_, value, child) => Container(
-                  color: Colors.black.withValues(alpha: (1 - value) * 0.40),
-                  child: child,
-                ),
-              ),
+      child: AnimatedOpacity(
+        opacity: _dismissing ? 0.0 : 1.0,
+        duration: _kFadeOut,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // ── 1. Dark scrim ───────────────────────────────────────────────
+            Container(color: Colors.black.withValues(alpha: 0.72))
+                .animate()
+                .fadeIn(duration: 280.ms),
 
-          // ── Expanding gold ring ──────────────────────────────────────────
-          Container(
-            width: 200,
-            height: 200,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.royalGold,
-                width: 1.5,
+            // ── 2. Central content ──────────────────────────────────────────
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _riveView(),
+                  const SizedBox(height: 28),
+                  _textBlock(),
+                ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.royalGold.withValues(alpha: 0.55),
-                  blurRadius: 52,
-                  spreadRadius: 14,
-                ),
-              ],
             ),
-          )
-              .animate()
-              .scale(
-                begin: const Offset(0.25, 0.25),
-                end: const Offset(1.15, 1.15),
-                duration: 650.ms,
-                curve: Curves.easeOutExpo,
-              )
-              .fadeIn(duration: 280.ms)
-              .then(delay: 450.ms)
-              .fadeOut(duration: 380.ms),
-
-          // ── "LEVEL UP" headline ──────────────────────────────────────────
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'LEVEL UP',
-                style: TextStyle(
-                  color: AppColors.royalGold,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 7,
-                  shadows: [
-                    Shadow(
-                      color: AppColors.royalGold.withValues(alpha: 0.85),
-                      blurRadius: 24,
-                    ),
-                  ],
-                ),
-              )
-                  .animate()
-                  .fadeIn(delay: 280.ms, duration: 350.ms)
-                  .scaleXY(
-                    begin: 0.65,
-                    end: 1.0,
-                    duration: 350.ms,
-                    curve: Curves.easeOut,
-                  )
-                  .then(delay: 600.ms)
-                  .fadeOut(duration: 350.ms),
-
-              const SizedBox(height: 8),
-
-              // Subtitle — smaller, neon blue, spaced out
-              Text(
-                'SYSTEM RESPONSE',
-                style: TextStyle(
-                  color: AppColors.neonBlue.withValues(alpha: 0.75),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 3.5,
-                ),
-              )
-                  .animate()
-                  .fadeIn(delay: 480.ms, duration: 300.ms)
-                  .then(delay: 520.ms)
-                  .fadeOut(duration: 350.ms),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+
+  // ── Rive / Fallback view ───────────────────────────────────────────────────
+
+  Widget _riveView() {
+    if (_useFallback) return const _FallbackGoldRing();
+
+    return SizedBox(
+      width: _riveSize,
+      height: _riveSize,
+      child: Rive(artboard: _artboard!, fit: BoxFit.contain),
+    )
+        .animate()
+        .fadeIn(duration: 250.ms)
+        .scaleXY(
+          begin: 0.82,
+          end: 1.0,
+          duration: 520.ms,
+          curve: Curves.easeOutBack,
+        );
+  }
+
+  // ── Text block ─────────────────────────────────────────────────────────────
+
+  Widget _textBlock() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // "SYSTEM UPDATE" — neon scan-line header
+        Text(
+          'SYSTEM UPDATE',
+          style: TextStyle(
+            color: AppColors.neonBlue.withValues(alpha: 0.88),
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 6,
+          ),
+        ).animate().fadeIn(delay: 380.ms, duration: 300.ms),
+
+        const SizedBox(height: 12),
+
+        // Thin gold divider — expands from centre outward
+        Container(
+          width: 220,
+          height: 0.8,
+          color: AppColors.royalGold.withValues(alpha: 0.55),
+        )
+            .animate()
+            .fadeIn(delay: 480.ms, duration: 180.ms)
+            .scaleX(
+              begin: 0.0,
+              end: 1.0,
+              delay: 480.ms,
+              duration: 360.ms,
+              curve: Curves.easeOut,
+            ),
+
+        const SizedBox(height: 16),
+
+        // "LEVEL X ACHIEVED" — gold headline
+        Text(
+          'LEVEL ${widget.newLevel} ACHIEVED',
+          style: TextStyle(
+            color: AppColors.royalGold,
+            fontSize: 26,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 3,
+            shadows: [
+              Shadow(
+                color: AppColors.royalGold.withValues(alpha: 0.90),
+                blurRadius: 20,
+              ),
+              Shadow(
+                color: AppColors.royalGold.withValues(alpha: 0.45),
+                blurRadius: 52,
+              ),
+            ],
+          ),
+        )
+            .animate()
+            .fadeIn(delay: 540.ms, duration: 360.ms)
+            .scaleXY(
+              begin: 0.72,
+              end: 1.0,
+              delay: 540.ms,
+              duration: 420.ms,
+              curve: Curves.easeOutBack,
+            ),
+      ],
+    );
+  }
 }
+
+// ─── Fallback: gold ring pulse ────────────────────────────────────────────────
+/// Shown when the Rive file is absent or fails to parse.
+/// Maintains the visual language of the overlay without depending on assets.
+class _FallbackGoldRing extends StatelessWidget {
+  const _FallbackGoldRing();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 200,
+      height: 200,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.royalGold, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.royalGold.withValues(alpha: 0.55),
+            blurRadius: 44,
+            spreadRadius: 14,
+          ),
+        ],
+      ),
+    )
+        .animate()
+        .scale(
+          begin: const Offset(0.2, 0.2),
+          end: const Offset(1.1, 1.1),
+          duration: 640.ms,
+          curve: Curves.easeOutExpo,
+        )
+        .fadeIn(duration: 280.ms);
+  }
+}
+
+// Back-compat alias so any callsite still using the old class name compiles.
+typedef SystemLevelUpAnimation = LevelUpOverlay;

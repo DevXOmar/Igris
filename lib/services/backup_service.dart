@@ -33,6 +33,7 @@ class BackupService {
   static const _dailyLogsBox = 'dailyLogsBox';
   static const _rivalsBox = 'rivalsBox';
   static const _fuelVaultBox = 'fuelVaultBox';
+  static const _settingsBox = 'settingsBox';
 
   // ── Export ─────────────────────────────────────────────────────────────────
 
@@ -53,16 +54,37 @@ class BackupService {
     final rivals =
         Hive.box<Rival>(_rivalsBox).values.map((r) => r.toJson()).toList();
 
-    final fuelVault = Hive.box<FuelVaultEntry>(_fuelVaultBox)
-        .values
-        .map((e) => e.toJson())
-        .toList();
+    final fuelVault = <Map<String, dynamic>>[];
+    for (final entry in Hive.box<FuelVaultEntry>(_fuelVaultBox).values) {
+      final json = entry.toJson();
+
+      // Persist the actual file path (on mobile/desktop) in imagePath.
+      // Additionally embed bytes so restore can recreate files on a new device.
+      final ext = _extractFileExtension(entry.imagePath);
+      final imageFileName = '${entry.id}.$ext';
+      final imageBytesBase64 = await tryReadFileAsBase64(entry.imagePath);
+
+      json['imageFileName'] = imageFileName;
+      json['imageBytesBase64'] = imageBytesBase64;
+      fuelVault.add(json);
+    }
+
+    final settingsBox = Hive.box(_settingsBox);
+    final settings = <String, dynamic>{};
+    for (final key in settingsBox.keys) {
+      if (key is! String) continue;
+      final value = settingsBox.get(key);
+      final encoded = _encodeSettingValue(value);
+      if (encoded == null && value != null) continue;
+      settings[key] = encoded;
+    }
 
     final payload = <String, dynamic>{
       'version': schemaVersion,
       'appVersion': backupAppVersion,
       'timestamp': DateTime.now().toUtc().toIso8601String(),
       'device': getBackupDevice(),
+      'settings': settings,
       'data': <String, dynamic>{
         'domains': domains,
         'tasks': tasks,
@@ -116,6 +138,10 @@ class BackupService {
     }
 
     final restored = data['data'] as Map<String, dynamic>;
+    final hasSettings = data['settings'] is Map;
+    final settings = hasSettings
+      ? Map<String, dynamic>.from(data['settings'] as Map)
+      : <String, dynamic>{};
 
     // 4. Clear all boxes
     await Hive.box<Domain>(_domainsBox).clear();
@@ -123,6 +149,21 @@ class BackupService {
     await Hive.box<DailyLog>(_dailyLogsBox).clear();
     await Hive.box<Rival>(_rivalsBox).clear();
     await Hive.box<FuelVaultEntry>(_fuelVaultBox).clear();
+
+    // 4b. Restore settings (only if present in backup)
+    if (hasSettings) {
+      await Hive.box(_settingsBox).clear();
+      final settingsBox = Hive.box(_settingsBox);
+      for (final entry in settings.entries) {
+        final key = entry.key;
+        final decoded = _decodeSettingValue(entry.value);
+        if (decoded == null) {
+          await settingsBox.delete(key);
+        } else {
+          await settingsBox.put(key, decoded);
+        }
+      }
+    }
 
     // 5. Restore
     final domainsBox = Hive.box<Domain>(_domainsBox);
@@ -151,9 +192,71 @@ class BackupService {
 
     final fuelVaultBox = Hive.box<FuelVaultEntry>(_fuelVaultBox);
     for (final json in restored['fuelVault'] as List<dynamic>) {
-      final e = FuelVaultEntry.fromJson(json as Map<String, dynamic>);
+      final map = Map<String, dynamic>.from(json as Map);
+
+      final imageBytesBase64 = map['imageBytesBase64'];
+      if (imageBytesBase64 is String && imageBytesBase64.isNotEmpty) {
+        final imageFileName = (map['imageFileName'] is String)
+            ? map['imageFileName'] as String
+            : _buildFallbackFuelVaultFileName(
+                id: map['id'] as String,
+                imagePath: map['imagePath'] as String?,
+              );
+
+        try {
+          final newPath = await writeFuelVaultImageFromBase64(
+            imageBytesBase64,
+            imageFileName,
+          );
+          map['imagePath'] = newPath;
+        } catch (_) {
+          // Best-effort: keep whatever imagePath was stored in the backup.
+        }
+      }
+
+      final e = FuelVaultEntry.fromJson(map);
       await fuelVaultBox.put(e.id, e);
     }
+  }
+
+  static String _extractFileExtension(String path) {
+    final lastDot = path.lastIndexOf('.');
+    if (lastDot == -1 || lastDot == path.length - 1) return 'jpg';
+    final ext = path.substring(lastDot + 1).toLowerCase();
+    if (ext.isEmpty) return 'jpg';
+    // Basic sanity: keep alphanumerics only.
+    final cleaned = ext.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    return cleaned.isEmpty ? 'jpg' : cleaned;
+  }
+
+  static String _buildFallbackFuelVaultFileName({
+    required String id,
+    required String? imagePath,
+  }) {
+    final ext = (imagePath == null) ? 'jpg' : _extractFileExtension(imagePath);
+    return '$id.$ext';
+  }
+
+  static Object? _encodeSettingValue(Object? value) {
+    if (value == null) return null;
+    if (value is String || value is num || value is bool) return value;
+    if (value is DateTime) {
+      return <String, dynamic>{'__t': 'DateTime', 'v': value.toIso8601String()};
+    }
+    // Unknown type — skip to avoid corrupt restore.
+    return null;
+  }
+
+  static Object? _decodeSettingValue(Object? value) {
+    if (value == null) return null;
+    if (value is String || value is num || value is bool) return value;
+    if (value is Map) {
+      final map = Map<String, dynamic>.from(value);
+      if (map['__t'] == 'DateTime' && map['v'] is String) {
+        return DateTime.parse(map['v'] as String);
+      }
+    }
+    return null;
   }
 
   // ── Validate ───────────────────────────────────────────────────────────────
