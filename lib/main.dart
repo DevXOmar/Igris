@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// responsive_framework: wraps every screen with breakpoint-aware layout logic.
+// Breakpoints: MOBILE (0–480), TABLET (481–1024), DESKTOP (1025+)
+import 'package:responsive_framework/responsive_framework.dart';
+// shadcn_ui: premium component library (cards, buttons, inputs, dialogs).
+// ShadTheme injected into the MaterialApp builder so ShadCard/ShadButton
+// pick up our dark color palette throughout the widget tree.
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'core/theme/app_theme.dart';
 import 'models/domain.dart';
 import 'models/task.dart';
@@ -8,6 +15,7 @@ import 'models/daily_log.dart';
 import 'models/fuel_vault_entry.dart';
 import 'models/rival.dart';
 import 'screens/home/home_screen.dart';
+import 'widgets/animations/animation_overlay.dart';
 
 class _AppScrollBehavior extends MaterialScrollBehavior {
   const _AppScrollBehavior();
@@ -70,8 +78,49 @@ class IgrisApp extends StatelessWidget {
       title: 'Igris',
       debugShowCheckedModeBanner: false,
       scrollBehavior: const _AppScrollBehavior(),
+      // IgrisThemeColors extension is embedded in darkTheme.extensions.
       theme: AppTheme.darkTheme,
-      home: const HomeScreen(),
+      // builder wraps every route with:
+      //   1. ResponsiveBreakpoints — makes layout adapt to MOBILE/TABLET/DESKTOP
+      //   2. ShadTheme — provides shadcn_ui components with our dark palette
+      builder: (context, child) {
+        return ResponsiveBreakpoints.builder(
+          // MOBILE ≤ 480 px (phones)
+          // TABLET 481–1024 px (tablets, small laptops)
+          // DESKTOP ≥ 1025 px (wide screens, web)
+          breakpoints: const [
+            Breakpoint(start: 0, end: 480, name: MOBILE),
+            Breakpoint(start: 481, end: 1024, name: TABLET),
+            Breakpoint(start: 1025, end: double.infinity, name: DESKTOP),
+          ],
+          child: ShadTheme(
+            // ShadThemeData injects our dark palette into shadcn_ui components.
+            // colorScheme uses ShadSlateColorScheme.dark() as the base —
+            // slate is the closest preset to our #0A0F1C background.
+            data: ShadThemeData(
+              brightness: Brightness.dark,
+              colorScheme: const ShadSlateColorScheme.dark(),
+            ),
+            child: child!,
+          ),
+        );
+      },
+      home: const _IgrisRoot(),
     );
+  }
+}
+
+/// Root widget that places [AnimationOverlay] above [HomeScreen].
+///
+/// The overlay watches [animationServiceProvider] and renders animation
+/// widgets on top of the full app when events are fired from anywhere in the
+/// widget tree. All overlays are [IgnorePointer] — user interaction is never
+/// blocked during an animation.
+class _IgrisRoot extends StatelessWidget {
+  const _IgrisRoot();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AnimationOverlay(child: HomeScreen());
   }
 }

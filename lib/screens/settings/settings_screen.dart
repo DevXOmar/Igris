@@ -7,14 +7,99 @@ import '../../providers/domain_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../widgets/ui/igris_ui.dart';
 import '../../widgets/layout/igris_screen_scaffold.dart';
+import '../../services/backup_service.dart';
 
 /// Settings screen for app configuration and grace token management
 /// Refactored with Igris UI components for consistent styling
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final _backupService = BackupService();
+  bool _isBackingUp = false;
+  bool _isRestoring = false;
+
+  Future<void> _runBackup() async {
+    setState(() => _isBackingUp = true);
+    try {
+      final path = await _backupService.exportBackup();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Backup saved to:\n$path'),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Backup failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isBackingUp = false);
+    }
+  }
+
+  Future<void> _runRestore() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.backgroundElevated,
+        title: const Text(
+          'Restore Backup?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: const Text(
+          'This will REPLACE all current data with the backup. '  
+          'This action cannot be undone.\n\nContinue?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Restore', style: TextStyle(color: AppColors.neonBlue)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isRestoring = true);
+    try {
+      await _backupService.restoreBackup();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Restore complete. Please restart the app to see your data.'),
+          duration: Duration(seconds: 6),
+        ),
+      );
+    } on BackupException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Restore failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isRestoring = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final graceState = ref.watch(graceProvider);
     final domainState = ref.watch(domainProvider);
     final taskState = ref.watch(taskProvider);
@@ -193,7 +278,63 @@ class SettingsScreen extends ConsumerWidget {
           ),
           
           SizedBox(height: DesignSystem.spacing16),
+
+          // Data Safety Section
+          IgrisCard(
+            variant: IgrisCardVariant.elevated,
+            child: Padding(
+              padding: DesignSystem.paddingAll16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.security,
+                        color: AppColors.gold,
+                      ),
+                      SizedBox(width: DesignSystem.spacing8),
+                      const Text(
+                        'Data Safety',
+                        style: TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: DesignSystem.spacing8),
+                  const Text(
+                    'Export a full backup of your domains, tasks, logs, rivals and fuel vault to a JSON file.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  SizedBox(height: DesignSystem.spacing16),
+                  IgrisButton(
+                    text: 'Backup Data',
+                    onPressed: _isBackingUp ? null : _runBackup,
+                    variant: IgrisButtonVariant.primary,
+                    isLoading: _isBackingUp,
+                    icon: Icons.upload_file,
+                    fullWidth: true,
+                  ),
+                  SizedBox(height: DesignSystem.spacing12),
+                  IgrisButton(
+                    text: 'Restore Backup',
+                    onPressed: _isRestoring ? null : _runRestore,
+                    variant: IgrisButtonVariant.outline,
+                    isLoading: _isRestoring,
+                    icon: Icons.download,
+                    fullWidth: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
           
+          SizedBox(height: DesignSystem.spacing16),
+
           // App Info Section
           IgrisCard(
             variant: IgrisCardVariant.elevated,
@@ -240,7 +381,7 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildInfoRow(BuildContext context, String label, String value) {
+  Widget _buildInfoRow(BuildContext ctx, String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

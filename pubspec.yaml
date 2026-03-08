@@ -20,8 +20,19 @@ dependencies:
   # Calendar
   table_calendar: ^3.0.9
   
-  # Animation
+  # Animation — micro-interactions and transitions throughout the UI
   flutter_animate: ^4.5.0
+  # Rive: hero-level system animations (level-up, domain-unlock).
+  # Place .riv files in assets/rive/. Widget falls back to flutter_animate
+  # glow effects if a file is missing, so the app works without custom assets.
+  rive: ^0.13.0
+  # Lottie: light celebration overlays (quest complete, milestone).
+  # Place .json files in assets/lottie/. Widget falls back to flutter_animate
+  # neon effects if a file is missing.
+  lottie: ^3.0.0
+  # Confetti: rare achievement bursts (level-up, weekly goal, streak).
+  # Palette-based particles — no bright rainbow defaults.
+  confetti: ^0.7.0
   
   # Utilities
   intl: ^0.20.2
@@ -29,7 +40,18 @@ dependencies:
 
   # Media
   image_picker: ^1.1.2
+  file_picker: ^8.0.0   # Restore backup: lets user pick .json from device
   path_provider: ^2.1.2
+
+  # Responsive layout — wraps root with breakpoint-aware builder
+  responsive_framework: ^1.4.0
+
+  # Progress / XP visuals — circular and linear percent indicators
+  percent_indicator: ^4.2.3
+
+  # Premium component library (shadcn/ui Flutter port)
+  # Used for: Cards, Buttons, Dialogs, Inputs, Bottom sheets
+  shadcn_ui: ^0.50.1
 
 dev_dependencies:
   flutter_test:
@@ -45,3 +67,7 @@ flutter:
 
   assets:
     - web/icons/
+    # Rive hero animations — drop .riv files here to replace flutter_animate fallbacks
+    - assets/rive/
+    # Lottie celebration overlays — drop .json files here to replace fallbacks
+    - assets/lottie/

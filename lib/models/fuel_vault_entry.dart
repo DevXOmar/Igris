@@ -36,6 +36,28 @@ class FuelVaultEntry extends HiveObject {
     required this.createdAt,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'imagePath': imagePath,
+      'title': title,
+      'note': note,
+      'category': category,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  factory FuelVaultEntry.fromJson(Map<String, dynamic> json) {
+    return FuelVaultEntry(
+      id: json['id'] as String,
+      imagePath: json['imagePath'] as String,
+      title: json['title'] as String?,
+      note: json['note'] as String?,
+      category: json['category'] as String?,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+    );
+  }
+
   FuelVaultEntry copyWith({
     String? id,
     String? imagePath,

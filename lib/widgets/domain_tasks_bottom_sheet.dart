@@ -6,6 +6,7 @@ import '../providers/task_provider.dart';
 import '../providers/daily_log_provider.dart';
 import '../core/theme/design_system.dart';
 import '../core/theme/igris_animations.dart';
+import '../services/animation_service.dart';
 
 /// Bottom sheet showing tasks for a specific domain
 /// Allows user to toggle task completion
@@ -149,10 +150,22 @@ class DomainTasksBottomSheet extends ConsumerWidget {
                     task: task,
                     isCompleted: isCompleted,
                     onToggle: () {
-                      // Toggle task completion
-                      // This automatically updates domain strength via provider
+                      // Toggle task completion.
+                      // This automatically updates domain strength via provider.
                       ref.read(dailyLogProvider.notifier)
                           .toggleTaskCompletion(task.id, task.domainId);
+
+                      // Fire quest-complete animation only when the user
+                      // marks the LAST incomplete task as done (not on untick).
+                      // [isCompleted] is captured from the current build
+                      // snapshot, so it reflects the state BEFORE the toggle.
+                      if (!isCompleted &&
+                          completedCount + 1 == domainTasks.length &&
+                          domainTasks.isNotEmpty) {
+                        ref
+                            .read(animationServiceProvider.notifier)
+                            .onQuestComplete();
+                      }
                     },
                   );
                 },

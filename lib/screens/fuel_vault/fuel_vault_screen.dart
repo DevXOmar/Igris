@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// responsive_framework: CrossAxisCount adapts to MOBILE / TABLET / DESKTOP
+import 'package:responsive_framework/responsive_framework.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
@@ -40,24 +42,36 @@ class FuelVaultScreen extends ConsumerWidget {
       ),
       child: state.entries.isEmpty
           ? _EmptyFuelVault(onAdd: () => _openAddSheet(context))
-          : GridView.builder(
-              physics: const ClampingScrollPhysics(),
-              padding: EdgeInsets.all(DesignSystem.spacing16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-              ),
-              itemCount: state.entries.length,
-              itemBuilder: (context, index) {
-                final entry = state.entries[index];
-                return _FuelVaultGridTile(
-                  entry: entry,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FuelVaultEntryDetailScreen(entry: entry),
-                      ),
+          : Builder(
+              builder: (innerContext) {
+                // responsive_framework: derive column count from active breakpoint
+                //   MOBILE  ( ≤ 480 px ) → 3 columns
+                //   TABLET  ( ≤ 1024 px) → 4 columns
+                //   DESKTOP ( > 1024 px ) → 5 columns
+                final bp = ResponsiveBreakpoints.of(innerContext);
+                final crossAxisCount =
+                    bp.largerThan(TABLET) ? 5 : bp.largerThan(MOBILE) ? 4 : 3;
+                return GridView.builder(
+                  physics: const ClampingScrollPhysics(),
+                  padding: EdgeInsets.all(DesignSystem.spacing16),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                  ),
+                  itemCount: state.entries.length,
+                  itemBuilder: (context, index) {
+                    final entry = state.entries[index];
+                    return _FuelVaultGridTile(
+                      entry: entry,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                FuelVaultEntryDetailScreen(entry: entry),
+                          ),
+                        );
+                      },
                     );
                   },
                 );

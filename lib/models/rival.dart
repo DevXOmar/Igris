@@ -46,6 +46,32 @@ class Rival extends HiveObject {
     this.imagePath,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'domain': domain,
+      'description': description,
+      'lastAchievement': lastAchievement,
+      'lastUpdated': lastUpdated.toIso8601String(),
+      'threatLevel': threatLevel,
+      'imagePath': imagePath,
+    };
+  }
+
+  factory Rival.fromJson(Map<String, dynamic> json) {
+    return Rival(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      domain: json['domain'] as String,
+      description: json['description'] as String,
+      lastAchievement: json['lastAchievement'] as String,
+      lastUpdated: DateTime.parse(json['lastUpdated'] as String),
+      threatLevel: json['threatLevel'] as int?,
+      imagePath: json['imagePath'] as String?,
+    );
+  }
+
   Rival copyWith({
     String? id,
     String? name,

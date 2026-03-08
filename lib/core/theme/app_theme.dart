@@ -71,6 +71,117 @@ class AppColors {
 }
 
 /// ═══════════════════════════════════════════════════════════════════════════
+/// IGRIS THEME EXTENSION — ThemeExtension<IgrisThemeColors>
+/// ═══════════════════════════════════════════════════════════════════════════
+/// Exposes the full Igris palette as a typed ThemeExtension so any widget can
+/// access colors without importing AppColors directly:
+///
+///   final igris = Theme.of(context).extension<IgrisThemeColors>()!;
+///   igris.neonBlue, igris.bloodRed, igris.royalGold …
+///
+/// Registered in AppTheme.darkTheme via extensions: [IgrisThemeColors.dark()]
+class IgrisThemeColors extends ThemeExtension<IgrisThemeColors> {
+  final Color neonBlue;
+  final Color deepBlue;
+  final Color bloodRed;
+  final Color bloodRedActive;
+  final Color royalGold;
+  final Color shadowPurple;
+  final Color backgroundPrimary;
+  final Color backgroundSurface;
+  final Color backgroundElevated;
+  final Color textPrimary;
+  final Color textSecondary;
+  final Color textMuted;
+  final Color dividerColor;
+
+  const IgrisThemeColors({
+    required this.neonBlue,
+    required this.deepBlue,
+    required this.bloodRed,
+    required this.bloodRedActive,
+    required this.royalGold,
+    required this.shadowPurple,
+    required this.backgroundPrimary,
+    required this.backgroundSurface,
+    required this.backgroundElevated,
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.textMuted,
+    required this.dividerColor,
+  });
+
+  /// Default dark palette — used in AppTheme.darkTheme.
+  const IgrisThemeColors.dark()
+      : neonBlue = AppColors.neonBlue,
+        deepBlue = AppColors.deepBlue,
+        bloodRed = AppColors.bloodRed,
+        bloodRedActive = AppColors.bloodRedActive,
+        royalGold = AppColors.royalGold,
+        shadowPurple = AppColors.shadowPurple,
+        backgroundPrimary = AppColors.backgroundPrimary,
+        backgroundSurface = AppColors.backgroundSurface,
+        backgroundElevated = AppColors.backgroundElevated,
+        textPrimary = AppColors.textPrimary,
+        textSecondary = AppColors.textSecondary,
+        textMuted = AppColors.textMuted,
+        dividerColor = AppColors.dividerColor;
+
+  @override
+  IgrisThemeColors copyWith({
+    Color? neonBlue,
+    Color? deepBlue,
+    Color? bloodRed,
+    Color? bloodRedActive,
+    Color? royalGold,
+    Color? shadowPurple,
+    Color? backgroundPrimary,
+    Color? backgroundSurface,
+    Color? backgroundElevated,
+    Color? textPrimary,
+    Color? textSecondary,
+    Color? textMuted,
+    Color? dividerColor,
+  }) {
+    return IgrisThemeColors(
+      neonBlue: neonBlue ?? this.neonBlue,
+      deepBlue: deepBlue ?? this.deepBlue,
+      bloodRed: bloodRed ?? this.bloodRed,
+      bloodRedActive: bloodRedActive ?? this.bloodRedActive,
+      royalGold: royalGold ?? this.royalGold,
+      shadowPurple: shadowPurple ?? this.shadowPurple,
+      backgroundPrimary: backgroundPrimary ?? this.backgroundPrimary,
+      backgroundSurface: backgroundSurface ?? this.backgroundSurface,
+      backgroundElevated: backgroundElevated ?? this.backgroundElevated,
+      textPrimary: textPrimary ?? this.textPrimary,
+      textSecondary: textSecondary ?? this.textSecondary,
+      textMuted: textMuted ?? this.textMuted,
+      dividerColor: dividerColor ?? this.dividerColor,
+    );
+  }
+
+  @override
+  IgrisThemeColors lerp(IgrisThemeColors? other, double t) {
+    if (other == null) return this;
+    return IgrisThemeColors(
+      neonBlue: Color.lerp(neonBlue, other.neonBlue, t)!,
+      deepBlue: Color.lerp(deepBlue, other.deepBlue, t)!,
+      bloodRed: Color.lerp(bloodRed, other.bloodRed, t)!,
+      bloodRedActive: Color.lerp(bloodRedActive, other.bloodRedActive, t)!,
+      royalGold: Color.lerp(royalGold, other.royalGold, t)!,
+      shadowPurple: Color.lerp(shadowPurple, other.shadowPurple, t)!,
+      backgroundPrimary: Color.lerp(backgroundPrimary, other.backgroundPrimary, t)!,
+      backgroundSurface: Color.lerp(backgroundSurface, other.backgroundSurface, t)!,
+      backgroundElevated: Color.lerp(backgroundElevated, other.backgroundElevated, t)!,
+      textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
+      textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
+      textMuted: Color.lerp(textMuted, other.textMuted, t)!,
+      dividerColor: Color.lerp(dividerColor, other.dividerColor, t)!,
+    );
+  }
+}
+
+/// ═══════════════════════════════════════════════════════════════════════════
 /// IGRIS THEME - SOLO LEVELING INSPIRED SYSTEM UI
 /// ═══════════════════════════════════════════════════════════════════════════
 ///
@@ -259,6 +370,10 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+
+      /// THEME EXTENSIONS — IgrisThemeColors registered here so any widget can
+      /// access the palette via Theme.of(context).extension<IgrisThemeColors>()!
+      extensions: const [IgrisThemeColors.dark()],
 
       /// COLOR SCHEME
       colorScheme: const ColorScheme.dark(

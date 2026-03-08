@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// percent_indicator: CircularPercentIndicator used for weekly score + streak rings.
+// Linear bars are NOT percent_indicator — domain bars remain custom widgets.
+import 'package:percent_indicator/percent_indicator.dart';
+// responsive_framework: breakpoint-aware layout decisions (column count, padding).
+import 'package:responsive_framework/responsive_framework.dart';
 import '../../providers/weekly_stats_provider.dart';
 import '../../core/utils/date_utils.dart' as app_date_utils;
 import '../../core/theme/app_theme.dart';
@@ -7,6 +12,7 @@ import '../../core/theme/design_system.dart';
 import '../../widgets/grace_tokens_display.dart';
 import '../../widgets/domain_progress_bar.dart';
 import '../../widgets/domain_tasks_bottom_sheet.dart';
+import '../../widgets/xp_level_widget.dart';
 import '../fuel_vault/vault_auth_screen.dart';
 
 /// Home content showing weekly cumulative progress per domain as horizontal bars
@@ -103,34 +109,67 @@ class HomeContent extends ConsumerWidget {
             
             const SliverToBoxAdapter(child: Divider(height: 1)),
             
-            // Weekly stats cards
+            // ── STAT RINGS ─────────────────────────────────────────────────
+            // Three circular rings in a row:
+            //   1. Weekly Score  — neon blue  (percent_indicator)
+            //   2. Streak        — blood red   (percent_indicator)
+            //   3. Level / XP   — royal gold  (XpLevelWidget, flutter_animate)
+            //
+            // responsive_framework: on TABLET+ the rings get slightly more
+            // padding and larger radius via ResponsiveBreakpoints.of(context).
             SliverToBoxAdapter(
               child: Padding(
                 padding: DesignSystem.paddingAll16,
-                child: Row(
-                  children: [
-                    // Weekly Score Card
-                    Expanded(
-                      child: _buildStatCard(
-                        context,
-                        'Weekly Score',
-                        '${weeklyStats.weeklyScore.toStringAsFixed(0)}%',
-                        Icons.analytics_outlined,
-                        AppTheme.deepBlue,
-                      ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSurface,
+                    borderRadius: DesignSystem.radiusStandard,
+                    border: Border.all(
+                      color: AppColors.dividerColor,
+                      width: DesignSystem.borderThin,
                     ),
-                    SizedBox(width: DesignSystem.spacing12),
-                    // Streak Card  
-                    Expanded(
-                      child: _buildStatCard(
-                        context,
-                        'Streak',
-                        '${weeklyStats.currentStreak} days',
-                        Icons.local_fire_department_outlined,
-                        AppTheme.bloodRedActive,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // ── Weekly Score ring (neon blue) ──────────────────
+                      _StatRing(
+                        label: 'WEEKLY',
+                        percent: (weeklyStats.weeklyScore / 100).clamp(0.0, 1.0),
+                        centerText: '${weeklyStats.weeklyScore.toInt()}%',
+                        progressColor: AppColors.neonBlue,
                       ),
-                    ),
-                  ],
+
+                      // Thin vertical divider
+                      Container(
+                        width: 1,
+                        height: 72,
+                        color: AppColors.dividerColor,
+                      ),
+
+                      // ── Streak ring (blood red, capped at 7 days) ──────
+                      _StatRing(
+                        label: 'STREAK',
+                        percent: (weeklyStats.currentStreak / 7).clamp(0.0, 1.0),
+                        centerText: '${weeklyStats.currentStreak}d',
+                        progressColor: AppColors.bloodRedActive,
+                      ),
+
+                      // Thin vertical divider
+                      Container(
+                        width: 1,
+                        height: 72,
+                        color: AppColors.dividerColor,
+                      ),
+
+                      // ── XP / Level ring (royal gold, flutter_animate) ──
+                      XpLevelWidget(
+                        weeklyScore: weeklyStats.weeklyScore,
+                        streak: weeklyStats.currentStreak,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -285,54 +324,6 @@ class HomeContent extends ConsumerWidget {
     );
   }
   
-  /// Stat card widget for weekly score and streak
-  /// Professional dark design with subtle borders and controlled colors
-  Widget _buildStatCard(
-    BuildContext context,
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: EdgeInsets.all(DesignSystem.spacing24 - 4), // 20px
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundElevated,
-        borderRadius: DesignSystem.radiusStandard,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline,
-          width: DesignSystem.borderThin,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            icon,
-            color: color,
-            size: DesignSystem.iconLarge,
-          ),
-          SizedBox(height: DesignSystem.spacing12),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: color,
-              letterSpacing: 1.0,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              letterSpacing: 0.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Empty state when no active domains
   Widget _buildEmptyState(BuildContext context) {
     return Center(
@@ -368,6 +359,75 @@ class HomeContent extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => DomainTasksBottomSheet(domain: domain),
+    );
+  }
+}
+
+// ─── Circular stat ring ─────────────────────────────────────────────────────
+// Uses percent_indicator's CircularPercentIndicator to visualise a single
+// numeric stat (weekly score or streak) with a colour-coded progress arc.
+// The ring animates on first build (animation: true) and on percent change.
+class _StatRing extends StatelessWidget {
+  final String label;
+  final double percent; // 0.0–1.0, already clamped by caller
+  final String centerText;
+  final Color progressColor;
+
+  const _StatRing({
+    required this.label,
+    required this.percent,
+    required this.centerText,
+    required this.progressColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // IgrisThemeColors gives typed access to the Igris dark palette without
+    // hard-coding hex values. All theme colours should come from here.
+    final igris = Theme.of(context).extension<IgrisThemeColors>();
+    final bgColor = igris?.backgroundElevated ?? AppColors.backgroundElevated;
+    final textMuted = igris?.textMuted ?? AppColors.textMuted;
+
+    // On TABLET+ bump the ring radius slightly so it fills the extra space.
+    final bool isTabletPlus =
+        ResponsiveBreakpoints.of(context).largerOrEqualTo(TABLET);
+    final double ringRadius = isTabletPlus ? 44.0 : 38.0;
+    final double lineWidth = isTabletPlus ? 6.0 : 5.0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircularPercentIndicator(
+          radius: ringRadius,
+          lineWidth: lineWidth,
+          percent: percent.clamp(0.0, 1.0),
+          animation: true,
+          animationDuration: 700,
+          circularStrokeCap: CircularStrokeCap.round,
+          progressColor: progressColor,
+          backgroundColor: bgColor,
+          center: Text(
+            centerText,
+            style: TextStyle(
+              color: progressColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: textMuted,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }
