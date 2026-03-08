@@ -146,11 +146,15 @@ class _FuelVaultGridTile extends StatelessWidget {
                 Hero(
                   tag: 'fuel-vault-${entry.id}',
                   child: kIsWeb
-                      ? Container(
-                          color: AppColors.backgroundElevated,
-                          child: const Icon(
-                            Icons.image,
-                            color: AppColors.textSecondary,
+                      ? Image.network(
+                          entry.imagePath,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: AppColors.backgroundElevated,
+                            child: const Icon(
+                              Icons.broken_image_outlined,
+                              color: AppColors.textMuted,
+                            ),
                           ),
                         )
                       : Image.file(

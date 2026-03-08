@@ -84,10 +84,14 @@ class FuelVaultEntryDetailScreen extends ConsumerWidget {
                     child: Hero(
                       tag: 'fuel-vault-${entry.id}',
                       child: kIsWeb
-                          ? const Icon(
-                              Icons.image,
-                              color: AppColors.textSecondary,
-                              size: 64,
+                          ? Image.network(
+                              entry.imagePath,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.broken_image_outlined,
+                                color: AppColors.textMuted,
+                                size: 64,
+                              ),
                             )
                           : Image.file(
                               File(entry.imagePath),

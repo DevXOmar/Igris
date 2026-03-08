@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +22,7 @@ class AddFuelBottomSheet extends ConsumerStatefulWidget {
 
 class _AddFuelBottomSheetState extends ConsumerState<AddFuelBottomSheet> {
   String? _imagePath;
+  Uint8List? _webPreviewBytes; // used on web for live preview
   final _titleCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
   final _categoryCtrl = TextEditingController();
@@ -36,8 +38,18 @@ class _AddFuelBottomSheetState extends ConsumerState<AddFuelBottomSheet> {
     super.dispose();
   }
 
+  /// Formats natively rendered by Flutter's Image.file().
+  static const _supportedExtensions = {
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'wbmp',
+  };
+
+  /// HEIC/HEIF are converted to JPEG by image_picker internally on iOS,
+  /// so we store them as .jpg so Flutter can render them.
+  static const _heicExtensions = {'heic', 'heif'};
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
+    // imageQuality: 85 triggers HEIC→JPEG conversion on iOS via image_picker.
     final xFile = await picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 85,
@@ -45,8 +57,31 @@ class _AddFuelBottomSheetState extends ConsumerState<AddFuelBottomSheet> {
     if (xFile == null) return;
 
     if (kIsWeb) {
-      // On web, just use the xFile path directly (no file copy needed).
-      setState(() => _imagePath = xFile.path);
+      // HEIC/HEIF cannot be decoded by any browser (except Safari).
+      // Detect early and show a friendly error instead of a codec crash.
+      final rawExtWeb = xFile.name.split('.').last.toLowerCase();
+      if (_heicExtensions.contains(rawExtWeb)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'HEIC/HEIF is not supported in browsers. '
+                'Please convert the photo to JPG or PNG first.',
+              ),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
+      // On web image_picker returns a blob URL. Read bytes for reliable preview
+      // and store the blob URL as the path (Image.network can resolve blob URLs).
+      final bytes = await xFile.readAsBytes();
+      setState(() {
+        _imagePath = xFile.path;
+        _webPreviewBytes = bytes;
+      });
       return;
     }
 
@@ -57,7 +92,12 @@ class _AddFuelBottomSheetState extends ConsumerState<AddFuelBottomSheet> {
       vaultDir.createSync(recursive: true);
     }
 
-    final ext = xFile.path.split('.').last;
+    // Normalize extension: HEIC/HEIF → jpg (already JPEG bytes from image_picker).
+    final rawExt = xFile.path.split('.').last.toLowerCase();
+    final ext = _heicExtensions.contains(rawExt)
+        ? 'jpg'
+        : (_supportedExtensions.contains(rawExt) ? rawExt : 'jpg');
+
     final destPath = '${vaultDir.path}/${_uuid.v4()}.$ext';
     await File(xFile.path).copy(destPath);
 
@@ -162,17 +202,7 @@ class _AddFuelBottomSheetState extends ConsumerState<AddFuelBottomSheet> {
                           child: _imagePath != null
                               ? ClipRRect(
                                   borderRadius: DesignSystem.radiusStandard,
-                                  child: kIsWeb
-                                      ? const Icon(
-                                          Icons.image,
-                                          color: AppColors.textSecondary,
-                                          size: 48,
-                                        )
-                                      : Image.file(
-                                          File(_imagePath!),
-                                          fit: BoxFit.cover,
-                                          width: double.infinity,
-                                        ),
+                                  child: _buildPreviewImage(),
                                 )
                               : Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -273,6 +303,24 @@ class _AddFuelBottomSheetState extends ConsumerState<AddFuelBottomSheet> {
         );
       },
     );
+  }
+
+  Widget _buildPreviewImage() {
+    if (kIsWeb && _webPreviewBytes != null) {
+      return Image.memory(
+        _webPreviewBytes!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+      );
+    }
+    if (!kIsWeb && _imagePath != null) {
+      return Image.file(
+        File(_imagePath!),
+        fit: BoxFit.cover,
+        width: double.infinity,
+      );
+    }
+    return const Icon(Icons.image, color: AppColors.textSecondary, size: 48);
   }
 
   Widget _buildField({
