@@ -4,6 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/navigation_provider.dart';
 import '../calendar/calendar_screen.dart';
 import '../domains/domains_screen.dart';
+import '../profile/system_profile_screen.dart';
 import '../rival_board/rival_board_screen.dart';
 import '../settings/settings_screen.dart';
 import 'home_content.dart';
@@ -18,7 +19,32 @@ class HomeScreen extends ConsumerWidget {
     final navState = ref.watch(navigationProvider);
     
     return Scaffold(
-      body: _getBody(navState.currentIndex),
+      body: Stack(
+        children: [
+          _getBody(navState.currentIndex),
+          // Persistent settings icon in the top-right corner, aligned with
+          // the AppBar actions area of each inner screen.
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 6, right: 4),
+                child: IconButton(
+                  icon: const Icon(Icons.settings_outlined),
+                  color: AppColors.neonBlue,
+                  iconSize: 22,
+                  tooltip: 'Settings',
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SettingsScreen(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: AppColors.backgroundSurface,
@@ -59,12 +85,12 @@ class HomeScreen extends ConsumerWidget {
               label: 'Domains',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.settings),
-              label: 'Settings',
-            ),
-            BottomNavigationBarItem(
               icon: Icon(Icons.radar),
               label: 'Rivals',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.military_tech),
+              label: 'Profile',
             ),
           ],
         ),
@@ -81,9 +107,9 @@ class HomeScreen extends ConsumerWidget {
       case 2:
         return const DomainsScreen();
       case 3:
-        return const SettingsScreen();
-      case 4:
         return const RivalBoardScreen();
+      case 4:
+        return const SystemProfileScreen();
       default:
         return const HomeContent();
     }

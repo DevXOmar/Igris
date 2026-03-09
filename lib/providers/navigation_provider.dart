@@ -40,12 +40,12 @@ class NavigationNotifier extends Notifier<NavigationState> {
   
   /// Navigate to domains screen
   void goToDomains() => setIndex(2);
-  
-  /// Navigate to settings screen
-  void goToSettings() => setIndex(3);
 
   /// Navigate to rival board screen
-  void goToRivalBoard() => setIndex(4);
+  void goToRivalBoard() => setIndex(3);
+
+  /// Navigate to system profile screen
+  void goToProfile() => setIndex(4);
 }
 
 /// Global provider for navigation state

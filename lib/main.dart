@@ -14,6 +14,8 @@ import 'models/task.dart';
 import 'models/daily_log.dart';
 import 'models/fuel_vault_entry.dart';
 import 'models/rival.dart';
+import 'models/feat.dart';
+import 'models/player_profile.dart';
 import 'screens/home/home_screen.dart';
 import 'widgets/animations/animation_overlay.dart';
 
@@ -50,6 +52,8 @@ void main() async {
   Hive.registerAdapter(DailyLogAdapter());
   Hive.registerAdapter(FuelVaultEntryAdapter());
   Hive.registerAdapter(RivalAdapter());
+  Hive.registerAdapter(FeatAdapter());
+  Hive.registerAdapter(PlayerProfileAdapter());
   
   // Open Hive Boxes
   await Hive.openBox<Domain>('domainsBox');
@@ -58,6 +62,7 @@ void main() async {
   await Hive.openBox<FuelVaultEntry>('fuelVaultBox');
   await Hive.openBox<Rival>('rivalsBox');
   await Hive.openBox('settingsBox');
+  await Hive.openBox<PlayerProfile>('playerProfileBox');
   
   runApp(
     // ProviderScope is required for Riverpod

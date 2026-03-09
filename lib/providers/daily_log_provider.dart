@@ -3,6 +3,7 @@ import '../models/daily_log.dart';
 import '../services/daily_log_service.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
 import 'domain_provider.dart';
+import 'progression_provider.dart';
 
 /// State class for DailyLog management
 /// Tracks today's log and provides quick access methods
@@ -80,6 +81,8 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
     } else {
       // Task was not completed, now completing -> increase strength
       ref.read(domainProvider.notifier).incrementDomainStrength(domainId);
+      // Award XP for task completion
+      ref.read(progressionProvider.notifier).recordTaskCompleted();
     }
     
     // Reload today's log

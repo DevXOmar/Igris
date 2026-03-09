@@ -164,10 +164,7 @@ class HomeContent extends ConsumerWidget {
                       ),
 
                       // ── XP / Level ring (royal gold, flutter_animate) ──
-                      XpLevelWidget(
-                        weeklyScore: weeklyStats.weeklyScore,
-                        streak: weeklyStats.currentStreak,
-                      ),
+                      XpLevelWidget(),
                     ],
                   ),
                 ),
