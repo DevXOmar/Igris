@@ -24,25 +24,26 @@ class HomeScreen extends ConsumerWidget {
           _getBody(navState.currentIndex),
           // Persistent settings icon in the top-right corner, aligned with
           // the AppBar actions area of each inner screen.
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 6, right: 4),
-                child: IconButton(
-                  icon: const Icon(Icons.settings_outlined),
-                  color: AppColors.neonBlue,
-                  iconSize: 22,
-                  tooltip: 'Settings',
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const SettingsScreen(),
+          if (navState.currentIndex != 4)
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6, right: 4),
+                  child: IconButton(
+                    icon: const Icon(Icons.settings_outlined),
+                    color: AppColors.neonBlue,
+                    iconSize: 22,
+                    tooltip: 'Settings',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const SettingsScreen(),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
       bottomNavigationBar: Container(

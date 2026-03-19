@@ -2,8 +2,13 @@ import 'dart:math';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' show Icons, IconData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/utils/date_utils.dart' as app_date_utils;
 import '../models/feat.dart';
 import '../models/player_profile.dart';
+import '../providers/domain_provider.dart';
+import '../providers/task_provider.dart';
+import '../providers/weekly_stats_provider.dart';
+import '../services/daily_log_service.dart';
 import '../services/progression_service.dart';
 import '../services/animation_service.dart';
 
@@ -24,7 +29,7 @@ class TitleDefinition {
   final IconData icon;
 
   /// Returns true when [profile] satisfies the unlock requirement.
-  final bool Function(PlayerProfile profile) checkCondition;
+  final bool Function(TitleUnlockContext context) checkCondition;
 
   const TitleDefinition({
     required this.id,
@@ -36,48 +41,290 @@ class TitleDefinition {
   });
 }
 
+/// Derived stats available when evaluating title unlock conditions.
+///
+/// This is constructed inside [ProgressionNotifier] so title checks can use
+/// current weekly stats and domain/task data in addition to [PlayerProfile].
+class TitleUnlockContext {
+  final PlayerProfile profile;
+  final WeeklyStats weeklyStats;
+  final DomainState domainState;
+  final TaskState taskState;
+  final DailyLogService _dailyLogService;
+
+  TitleUnlockContext({
+    required this.profile,
+    required this.weeklyStats,
+    required this.domainState,
+    required this.taskState,
+    DailyLogService? dailyLogService,
+  }) : _dailyLogService = dailyLogService ?? DailyLogService();
+
+  /// Total completed task instances within the current streak window.
+  ///
+  /// Uses [weeklyStats.currentStreak] (days) and sums completed IDs in logs.
+  late final int completedTaskInstancesInCurrentStreak = () {
+    final streakDays = weeklyStats.currentStreak;
+    if (streakDays <= 0) return 0;
+
+    final today = app_date_utils.DateUtils.today;
+    var total = 0;
+    for (int i = 0; i < streakDays; i++) {
+      final date = today.subtract(Duration(days: i));
+      final log = _dailyLogService.getLogForDate(date);
+      if (log == null) continue;
+      total += log.completedTaskIds.length;
+    }
+    return total;
+  }();
+
+  /// Distinct one-time tasks that have ever been completed at least once.
+  ///
+  /// Used as a proxy for "backlog" tasks.
+  late final int distinctOneTimeTasksCompleted = () {
+    final oneTimeTaskIds = taskState.oneTimeTasks.map((t) => t.id).toSet();
+    if (oneTimeTaskIds.isEmpty) return 0;
+
+    final completed = <String>{};
+    for (final log in _dailyLogService.getAllLogs()) {
+      for (final id in log.completedTaskIds) {
+        if (oneTimeTaskIds.contains(id)) {
+          completed.add(id);
+        }
+      }
+    }
+    return completed.length;
+  }();
+
+  int sumDomainStrengthWhere(bool Function(String name) predicate) {
+    var total = 0;
+    for (final d in domainState.domains) {
+      final name = d.name.trim();
+      if (name.isEmpty) continue;
+      if (predicate(name.toLowerCase())) total += d.strength;
+    }
+    return total;
+  }
+
+  bool anyDomainStrengthAtLeast(int threshold) {
+    for (final d in domainState.domains) {
+      if (d.strength >= threshold) return true;
+    }
+    return false;
+  }
+
+  List<double> get _activeWeeklyProgressValues {
+    if (weeklyStats.weeklyProgress.isEmpty) return const [];
+    final values = <double>[];
+    for (final domain in domainState.activeDomains) {
+      final progress = weeklyStats.weeklyProgress[domain];
+      if (progress != null) values.add(progress);
+    }
+    return values;
+  }
+
+  bool get hasActivityAcrossAllActiveDomainsThisWeek {
+    final active = domainState.activeDomains;
+    if (active.length < 2) return false;
+    for (final domain in active) {
+      final progress = weeklyStats.weeklyProgress[domain] ?? 0.0;
+      if (progress <= 0.0) return false;
+    }
+    return true;
+  }
+
+  bool get hasBalancedWeeklyProgressAcrossDomains {
+    final values = _activeWeeklyProgressValues;
+    if (values.length < 2) return false;
+    final minP = values.reduce(min);
+    final maxP = values.reduce(max);
+    // Simple "balanced" heuristic: everyone is participating, and no domain
+    // lags too far behind.
+    return minP >= 0.40 && (maxP - minP) <= 0.25;
+  }
+}
+
 // ignore: avoid_classes_with_only_static_members
 class TitleDefinitions {
+  static const int _domainConquerorStrengthThreshold = 250;
+
+  static final RegExp _studyRe = RegExp(
+    r'\b(study|studies|learn|learning|school|college|university|reading|read|book|course|exam)\b',
+    caseSensitive: false,
+  );
+  static final RegExp _workRe = RegExp(
+    r'\b(work|job|career|business|productivity|project|projects|office|deep work)\b',
+    caseSensitive: false,
+  );
+  static final RegExp _fitnessRe = RegExp(
+    r'\b(fitness|workout|gym|health|run|running|cardio|strength|training)\b',
+    caseSensitive: false,
+  );
+
   static final List<TitleDefinition> all = [
     TitleDefinition(
-      id: 'wolf_assassin',
-      name: 'Wolf Assassin',
-      description: 'Swift, precise, relentless in execution.',
-      unlockCondition: 'Complete 100 tasks',
-      icon: Icons.flash_on,
-      checkCondition: (p) => p.totalTasksCompleted >= 100,
+      id: 'novice_hunter',
+      name: 'Novice Hunter',
+      description: 'A new hunter steps into the gates.',
+      unlockCondition: 'Complete 10 tasks',
+      icon: Icons.emoji_events_outlined,
+      checkCondition: (c) => c.profile.totalTasksCompleted >= 10,
     ),
     TitleDefinition(
-      id: 'relentless',
-      name: 'Relentless',
-      description: 'Consistency is your weapon.',
+      id: 'awakened_star',
+      name: 'Awakened ★',
+      description: 'Your power has begun to surface.',
+      unlockCondition: 'Reach Level 5',
+      icon: Icons.auto_awesome,
+      checkCondition: (c) => c.profile.level >= 5,
+    ),
+    TitleDefinition(
+      id: 'daily_survivor',
+      name: 'Daily Survivor',
+      description: 'You kept moving, day after day.',
       unlockCondition: '7-day streak',
-      icon: Icons.local_fire_department,
-      checkCondition: (p) => p.longestStreak >= 7,
+      icon: Icons.shield_outlined,
+      checkCondition: (c) => c.profile.longestStreak >= 7,
     ),
     TitleDefinition(
-      id: 'architect',
-      name: 'Architect',
+      id: 'relentless_star',
+      name: 'Relentless ★',
+      description: 'Consistency is your weapon.',
+      unlockCondition: '30-day streak',
+      icon: Icons.local_fire_department,
+      checkCondition: (c) => c.profile.longestStreak >= 30,
+    ),
+    TitleDefinition(
+      id: 'iron_will',
+      name: 'Iron Will',
+      description: 'A mind that refuses to fracture.',
+      unlockCondition: '50 tasks without breaking streak',
+      icon: Icons.military_tech_outlined,
+      checkCondition: (c) => c.completedTaskInstancesInCurrentStreak >= 50,
+    ),
+    TitleDefinition(
+      id: 'wolf_assassin_star',
+      name: 'Wolf Assassin ★',
+      description: 'Swift, precise, relentless in execution.',
+      unlockCondition: '100 total tasks',
+      icon: Icons.flash_on,
+      checkCondition: (c) => c.profile.totalTasksCompleted >= 100,
+    ),
+    TitleDefinition(
+      id: 'architect_star',
+      name: 'Architect ★',
       description: 'Builds mastery across multiple domains.',
-      unlockCondition: 'Reach level 10',
+      unlockCondition: 'Reach Level 10',
       icon: Icons.account_tree,
-      checkCondition: (p) => p.level >= 10,
+      checkCondition: (c) => c.profile.level >= 10,
     ),
     TitleDefinition(
       id: 'scholar',
       name: 'Scholar',
       description: 'Knowledge through persistent discipline.',
-      unlockCondition: 'Complete 500 tasks',
+      unlockCondition: '200 study-related tasks',
       icon: Icons.menu_book,
-      checkCondition: (p) => p.totalTasksCompleted >= 500,
+      checkCondition: (c) =>
+          c.sumDomainStrengthWhere((n) => _studyRe.hasMatch(n)) >= 200,
     ),
     TitleDefinition(
-      id: 'iron_discipline',
-      name: 'Iron Discipline',
-      description: 'Thirty days of unbreakable will.',
-      unlockCondition: '30-day streak',
-      icon: Icons.shield,
-      checkCondition: (p) => p.longestStreak >= 30,
+      id: 'forge_master',
+      name: 'Forge Master',
+      description: 'Turns effort into output, again and again.',
+      unlockCondition: '150 work/productivity tasks',
+      icon: Icons.build_outlined,
+      checkCondition: (c) =>
+          c.sumDomainStrengthWhere((n) => _workRe.hasMatch(n)) >= 150,
+    ),
+    TitleDefinition(
+      id: 'titan_of_fitness',
+      name: 'Titan of Fitness',
+      description: 'A body forged in repetition.',
+      unlockCondition: '100 fitness tasks',
+      icon: Icons.fitness_center,
+      checkCondition: (c) =>
+          c.sumDomainStrengthWhere((n) => _fitnessRe.hasMatch(n)) >= 100,
+    ),
+    TitleDefinition(
+      id: 'shadow_walker',
+      name: 'Shadow Walker',
+      description: 'Moves through every domain without faltering.',
+      unlockCondition: 'Consistent activity across ALL domains',
+      icon: Icons.blur_on,
+      checkCondition: (c) => c.hasActivityAcrossAllActiveDomainsThisWeek,
+    ),
+    TitleDefinition(
+      id: 'domain_conqueror',
+      name: 'Domain Conqueror',
+      description: 'One domain stands fully conquered.',
+      unlockCondition: 'Max out one domain',
+      icon: Icons.flag_outlined,
+      checkCondition: (c) => c.anyDomainStrengthAtLeast(_domainConquerorStrengthThreshold),
+    ),
+    TitleDefinition(
+      id: 's_rank_candidate_star',
+      name: 'S-Rank Candidate ★',
+      description: 'Your presence alone shifts the room.',
+      unlockCondition: 'Level 30',
+      icon: Icons.stars_rounded,
+      checkCondition: (c) => c.profile.level >= 30,
+    ),
+    TitleDefinition(
+      id: 'double_dungeon_survivor',
+      name: 'Double Dungeon Survivor',
+      description: 'You endured the week’s crushing weight.',
+      unlockCondition: '50 tasks in one week',
+      icon: Icons.calendar_month_outlined,
+      checkCondition: (c) => c.weeklyStats.completedTasksThisWeek >= 50,
+    ),
+    TitleDefinition(
+      id: 'igris_blade_star',
+      name: 'Igris’ Blade ★',
+      description: 'Loyalty sharpened into an edge.',
+      unlockCondition: '100-day streak',
+      icon: Icons.gavel,
+      checkCondition: (c) => c.profile.longestStreak >= 100,
+    ),
+    TitleDefinition(
+      id: 'rulers_authority',
+      name: 'Ruler’s Authority',
+      description: 'Balance maintained. Order enforced.',
+      unlockCondition: 'Maintain balanced weekly progress across domains',
+      icon: Icons.balance,
+      checkCondition: (c) => c.hasBalancedWeeklyProgressAcrossDomains,
+    ),
+    TitleDefinition(
+      id: 'shadow_summoner_star',
+      name: 'Shadow Summoner ★',
+      description: 'A legion formed from relentless completion.',
+      unlockCondition: '1000 total tasks',
+      icon: Icons.groups_2_outlined,
+      checkCondition: (c) => c.profile.totalTasksCompleted >= 1000,
+    ),
+    TitleDefinition(
+      id: 'national_level_hunter',
+      name: 'National Level Hunter',
+      description: 'A name known far beyond the gates.',
+      unlockCondition: 'Level 100 OR major real-world milestone',
+      icon: Icons.public,
+      checkCondition: (c) => c.profile.level >= 100 || c.profile.feats.isNotEmpty,
+    ),
+    TitleDefinition(
+      id: 'kamish_slayer_reworked',
+      name: 'Kamish Slayer (REWORKED)',
+      description: 'You cleared what others abandoned.',
+      unlockCondition: 'Clear 100+ backlog/overdue tasks',
+      icon: Icons.task_alt,
+      checkCondition: (c) => c.distinctOneTimeTasksCompleted >= 100,
+    ),
+    TitleDefinition(
+      id: 'shadow_monarch_star',
+      name: 'Shadow Monarch ★',
+      description: 'A year of discipline — and beyond.',
+      unlockCondition: '365-day streak + extreme consistency',
+      icon: Icons.workspace_premium,
+      checkCondition: (c) =>
+          c.profile.longestStreak >= 365 && c.profile.weeklyGoalsCompleted >= 12,
     ),
   ];
 
@@ -151,7 +398,23 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   final ProgressionService _service = ProgressionService();
 
   @override
-  PlayerProfile build() => _service.getProfile();
+  PlayerProfile build() {
+    final profile = _service.getProfile();
+    final knownIds = TitleDefinitions.all.map((t) => t.id).toSet();
+    final sanitizedActive =
+        profile.activeTitleIds.where(knownIds.contains).toList(growable: false);
+    final sanitizedUnlocked =
+        profile.unlockedTitleIds.where(knownIds.contains).toList(growable: false);
+
+    if (sanitizedActive.length == profile.activeTitleIds.length &&
+        sanitizedUnlocked.length == profile.unlockedTitleIds.length) {
+      return profile;
+    }
+    return profile.copyWith(
+      activeTitleIds: sanitizedActive,
+      unlockedTitleIds: sanitizedUnlocked,
+    );
+  }
 
   // ── Formula: requiredXP = baseXP * level^1.5 ────────────────────────────
 
@@ -253,8 +516,8 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   }) async {
     final feat =
         Feat(name: name, description: description, timestamp: DateTime.now());
-    final profile =
-        state.copyWith(feats: [...state.feats, feat]);
+    var profile = state.copyWith(feats: [...state.feats, feat]);
+    profile = _withTitleUnlocks(profile);
     await _service.saveProfile(profile);
     state = profile;
   }
@@ -274,6 +537,13 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     final profile = state.copyWith(
       activeTitleIds: state.activeTitleIds.where((t) => t != id).toList(),
     );
+    await _service.saveProfile(profile);
+    state = profile;
+  }
+
+  /// Updates the editable hunter name shown on the profile screen.
+  Future<void> updateName(String name) async {
+    final profile = state.copyWith(name: name.trim());
     await _service.saveProfile(profile);
     state = profile;
   }
@@ -342,8 +612,14 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   /// Returns a new [PlayerProfile] with any newly earned titles added.
   PlayerProfile _withTitleUnlocks(PlayerProfile profile) {
     final unlocked = List<String>.from(profile.unlockedTitleIds);
+    final context = TitleUnlockContext(
+      profile: profile,
+      weeklyStats: ref.read(weeklyStatsProvider),
+      domainState: ref.read(domainProvider),
+      taskState: ref.read(taskProvider),
+    );
     for (final title in TitleDefinitions.all) {
-      if (!unlocked.contains(title.id) && title.checkCondition(profile)) {
+      if (!unlocked.contains(title.id) && title.checkCondition(context)) {
         unlocked.add(title.id);
       }
     }

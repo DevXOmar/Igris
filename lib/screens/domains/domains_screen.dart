@@ -28,12 +28,13 @@ class DomainsScreen extends ConsumerWidget {
     return IgrisScreenScaffold(
       title: 'Domains',
       applyPadding: false,
-      actions: [
-        IconButton(
-          onPressed: () => _showAddDomainDialog(context, ref),
-          icon: Icon(Icons.add, color: AppColors.neonBlue, size: 24),
-        ),
-      ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showAddDomainDialog(context, ref),
+        backgroundColor: AppColors.neonBlue,
+        foregroundColor: AppColors.backgroundPrimary,
+        tooltip: 'Add Domain',
+        child: const Icon(Icons.add, size: 28),
+      ),
       child: domainState.domains.isEmpty
           ? Center(
               child: Column(

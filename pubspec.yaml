@@ -49,6 +49,9 @@ dependencies:
   # Progress / XP visuals — circular and linear percent indicators
   percent_indicator: ^4.2.3
 
+  # Premium fonts — Orbitron (rank/level display) + Rajdhani (UI text)
+  google_fonts: ^6.1.0
+
   # Premium component library (shadcn/ui Flutter port)
   # Used for: Cards, Buttons, Dialogs, Inputs, Bottom sheets
   shadcn_ui: ^0.50.1

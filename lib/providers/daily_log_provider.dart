@@ -77,12 +77,12 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
     // Update domain strength
     if (wasCompleted) {
       // Task was completed, now uncompleting -> reduce strength
-      ref.read(domainProvider.notifier).decrementDomainStrength(domainId);
+      await ref.read(domainProvider.notifier).decrementDomainStrength(domainId);
     } else {
       // Task was not completed, now completing -> increase strength
-      ref.read(domainProvider.notifier).incrementDomainStrength(domainId);
+      await ref.read(domainProvider.notifier).incrementDomainStrength(domainId);
       // Award XP for task completion
-      ref.read(progressionProvider.notifier).recordTaskCompleted();
+      await ref.read(progressionProvider.notifier).recordTaskCompleted();
     }
     
     // Reload today's log
@@ -93,7 +93,8 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
   Future<void> completeTask(String taskId, String domainId) async {
     if (!state.isTaskCompletedToday(taskId)) {
       await _service.completeTask(state.today, taskId);
-      ref.read(domainProvider.notifier).incrementDomainStrength(domainId);
+      await ref.read(domainProvider.notifier).incrementDomainStrength(domainId);
+      await ref.read(progressionProvider.notifier).recordTaskCompleted();
       loadTodayLog();
     }
   }
@@ -102,7 +103,7 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
   Future<void> uncompleteTask(String taskId, String domainId) async {
     if (state.isTaskCompletedToday(taskId)) {
       await _service.uncompleteTask(state.today, taskId);
-      ref.read(domainProvider.notifier).decrementDomainStrength(domainId);
+      await ref.read(domainProvider.notifier).decrementDomainStrength(domainId);
       loadTodayLog();
     }
   }

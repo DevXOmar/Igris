@@ -50,6 +50,10 @@ class PlayerProfile {
   @HiveField(9)
   final int lastStreakMilestoneAwarded;
 
+  /// Editable hunter name shown on the profile screen.
+  @HiveField(10)
+  final String name;
+
   const PlayerProfile({
     this.level = 1,
     this.currentXP = 0,
@@ -61,6 +65,7 @@ class PlayerProfile {
     this.weeklyGoalsCompleted = 0,
     this.longestStreak = 0,
     this.lastStreakMilestoneAwarded = 0,
+    this.name = '',
   });
 
   PlayerProfile copyWith({
@@ -74,6 +79,7 @@ class PlayerProfile {
     int? weeklyGoalsCompleted,
     int? longestStreak,
     int? lastStreakMilestoneAwarded,
+    String? name,
   }) {
     return PlayerProfile(
       level: level ?? this.level,
@@ -87,6 +93,7 @@ class PlayerProfile {
       longestStreak: longestStreak ?? this.longestStreak,
       lastStreakMilestoneAwarded:
           lastStreakMilestoneAwarded ?? this.lastStreakMilestoneAwarded,
+      name: name ?? this.name,
     );
   }
 }

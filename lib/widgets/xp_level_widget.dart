@@ -23,43 +23,36 @@ class XpLevelWidget extends ConsumerStatefulWidget {
 }
 
 class _XpLevelWidgetState extends ConsumerState<XpLevelWidget> {
-  int _prevLevel = 0;
   bool _levelUpPulse = false;
-  int _prevStreak = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _prevLevel = ref.read(progressionProvider).level;
-    _prevStreak = ref.read(weeklyStatsProvider).currentStreak;
-  }
 
   @override
   Widget build(BuildContext context) {
     final igris = Theme.of(context).extension<IgrisThemeColors>()!;
 
+    ref.listen<int>(
+      progressionProvider.select((profile) => profile.level),
+      (previous, next) {
+        if (previous == null || next <= previous || !mounted) return;
+
+        setState(() => _levelUpPulse = true);
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (mounted) {
+            setState(() => _levelUpPulse = false);
+          }
+        });
+      },
+    );
+
+    ref.listen<int>(
+      weeklyStatsProvider.select((stats) => stats.currentStreak),
+      (previous, next) {
+        if (previous == null || previous == next) return;
+        ref.read(progressionProvider.notifier).syncStreak(next);
+      },
+    );
+
     final profile = ref.watch(progressionProvider);
     final xpPercent = ref.watch(xpProgressProvider);
-    final streak = ref.watch(weeklyStatsProvider).currentStreak;
-
-    // Level-up pulse detection
-    if (profile.level > _prevLevel) {
-      _levelUpPulse = true;
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) setState(() => _levelUpPulse = false);
-      });
-    }
-    _prevLevel = profile.level;
-
-    // Streak sync — bridge weeklyStats streak into the progression model
-    if (streak != _prevStreak) {
-      _prevStreak = streak;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ref.read(progressionProvider.notifier).syncStreak(streak);
-        }
-      });
-    }
 
     final List<BoxShadow> glowShadow = _levelUpPulse
         ? [
