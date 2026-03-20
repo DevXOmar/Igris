@@ -27,6 +27,7 @@ class _AddRivalBottomSheetState extends ConsumerState<AddRivalBottomSheet> {
   final _descCtrl = TextEditingController();
   final _achievementCtrl = TextEditingController();
   int? _threatLevel;
+  RivalCategory _category = RivalCategory.proximal;
   bool _saving = false;
 
   @override
@@ -39,6 +40,7 @@ class _AddRivalBottomSheetState extends ConsumerState<AddRivalBottomSheet> {
       _descCtrl.text = r.description;
       _achievementCtrl.text = r.lastAchievement;
       _threatLevel = r.threatLevel;
+      _category = r.category;
     }
   }
 
@@ -74,6 +76,7 @@ class _AddRivalBottomSheetState extends ConsumerState<AddRivalBottomSheet> {
           lastAchievement: achievement.isEmpty ? '' : achievement,
           lastUpdated: DateTime.now(),
           threatLevel: _threatLevel,
+          category: _category,
           clearThreatLevel: _threatLevel == null,
         ),
       );
@@ -87,6 +90,7 @@ class _AddRivalBottomSheetState extends ConsumerState<AddRivalBottomSheet> {
           lastAchievement: achievement,
           lastUpdated: DateTime.now(),
           threatLevel: _threatLevel,
+          categoryKey: _category.key,
         ),
       );
     }
@@ -190,6 +194,20 @@ class _AddRivalBottomSheetState extends ConsumerState<AddRivalBottomSheet> {
                     ),
                     SizedBox(height: DesignSystem.spacing16),
 
+                    // Category
+                    Text(
+                      'Category',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
+                    ),
+                    SizedBox(height: DesignSystem.spacing8),
+                    _CategoryPicker(
+                      value: _category,
+                      onChanged: (v) => setState(() => _category = v),
+                    ),
+                    SizedBox(height: DesignSystem.spacing16),
+
                     // Threat level
                     Text(
                       'Threat Level (optional)',
@@ -289,6 +307,55 @@ class _ThreatLevelPicker extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+class _CategoryPicker extends StatelessWidget {
+  final RivalCategory value;
+  final ValueChanged<RivalCategory> onChanged;
+
+  const _CategoryPicker({required this.value, required this.onChanged});
+
+  Color _accent(RivalCategory c) {
+    return switch (c) {
+      RivalCategory.proximal => AppColors.neonBlue,
+      RivalCategory.apex => AppColors.shadowPurple,
+      RivalCategory.mythic => AppColors.royalGold,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: DesignSystem.spacing8,
+      runSpacing: DesignSystem.spacing8,
+      children: RivalCategory.values.map((c) {
+        final selected = c == value;
+        final accent = _accent(c);
+
+        return ChoiceChip(
+          label: Text(c.label),
+          selected: selected,
+          onSelected: (_) => onChanged(c),
+          selectedColor: accent.withValues(alpha: 0.18),
+          backgroundColor: AppColors.backgroundElevated,
+          labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: selected ? accent : AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+              ),
+          side: BorderSide(
+            color: selected
+                ? accent.withValues(alpha: 0.75)
+                : AppColors.textMuted.withValues(alpha: 0.25),
+            width: 1.0,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+        );
+      }).toList(),
     );
   }
 }

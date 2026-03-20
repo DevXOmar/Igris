@@ -369,7 +369,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Divider(color: AppColors.neonBlue.withValues(alpha: 0.2)),
                   SizedBox(height: DesignSystem.spacing8),
                   const Text(
-                    'A personal productivity and identity-tracking app.',
+                    'A proximal productivity and identity-tracking app.',
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
                 ],
