@@ -394,6 +394,8 @@ int _rankIndex(String rank) {
 /// - [addXP]               — direct XP injection (public for flexibility)
 class ProgressionNotifier extends Notifier<PlayerProfile> {
   static const int _baseXP = 100;
+  static const int _xpPerStatPoint = 250;
+  static const int _maxStatValue = PlayerProfile.defaultMaxStatValue;
 
   final ProgressionService _service = ProgressionService();
 
@@ -471,7 +473,10 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   /// level-up → rank promotion → title unlocks.
   Future<void> addXP(int amount) async {
     var profile = state;
-    profile = profile.copyWith(currentXP: profile.currentXP + amount);
+    profile = profile.copyWith(
+      currentXP: profile.currentXP + amount,
+      totalXP: profile.totalXP + amount,
+    );
 
     // Level-up loop (handles multi-level skips in one call)
     bool didLevelUp = false;
@@ -505,6 +510,36 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     // Title unlock check
     profile = _withTitleUnlocks(profile);
 
+    // XP milestone → stat point awards
+    profile = _withStatPointMilestones(profile);
+
+    await _service.saveProfile(profile);
+    state = profile;
+  }
+
+  /// Persists a new stat map and updates unspent points.
+  ///
+  /// This is the only write path for stat allocation UI.
+  Future<void> updateStats({
+    required Map<String, int> stats,
+    required int unspentStatPoints,
+  }) async {
+    final normalizedStats = <String, int>{
+      ...PlayerProfile.defaultStats,
+      ...stats,
+    };
+
+    // Clamp values to prevent invalid persistence.
+    normalizedStats.updateAll((_, v) {
+      if (v < 0) return 0;
+      if (v > _maxStatValue) return _maxStatValue;
+      return v;
+    });
+
+    final profile = state.copyWith(
+      stats: normalizedStats,
+      unspentStatPoints: unspentStatPoints < 0 ? 0 : unspentStatPoints,
+    );
     await _service.saveProfile(profile);
     state = profile;
   }
@@ -625,6 +660,17 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     }
     if (unlocked.length == profile.unlockedTitleIds.length) return profile;
     return profile.copyWith(unlockedTitleIds: unlocked);
+  }
+
+  PlayerProfile _withStatPointMilestones(PlayerProfile profile) {
+    if (_xpPerStatPoint <= 0) return profile;
+    final earned = profile.totalXP ~/ _xpPerStatPoint;
+    final delta = earned - profile.statPointsAwarded;
+    if (delta <= 0) return profile;
+    return profile.copyWith(
+      statPointsAwarded: earned,
+      unspentStatPoints: profile.unspentStatPoints + delta,
+    );
   }
 }
 

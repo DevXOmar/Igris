@@ -6,8 +6,11 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../models/feat.dart';
+import '../../models/player_profile.dart';
 import '../../providers/progression_provider.dart';
+import '../../widgets/hunter_radar_chart.dart';
 import '../settings/settings_screen.dart';
+import 'stats_allocation_screen.dart';
 import 'widgets/hunter_titles_section.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -139,6 +142,10 @@ class SystemProfileScreen extends ConsumerWidget {
                   const _LevelCardSection(),
                   const SizedBox(height: 28),
 
+                  // 3b. Hunter Stats (radar + allocation entry)
+                  const _HunterStatsSection(),
+                  const SizedBox(height: 28),
+
                   // 4. Active Titles
                   const _SectionLabel(text: 'ACTIVE TITLES'),
                   const SizedBox(height: 10),
@@ -221,6 +228,167 @@ class _LevelCardSection extends ConsumerWidget {
       xpProgress: xpProgress,
       totalTasks: totalTasks,
       longestStreak: longestStreak,
+    );
+  }
+}
+
+class _HunterStatsSection extends ConsumerWidget {
+  const _HunterStatsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(progressionProvider);
+    final stats = {
+      ...PlayerProfile.defaultStats,
+      ...profile.stats,
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.neonBlue.withValues(alpha: 0.18),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const _SectionLabel(text: 'HUNTER STATS'),
+              const Spacer(),
+              _AllocateStatsButton(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const StatsAllocationScreen()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              HunterRadarChart(
+                stats: stats,
+                size: 160,
+                maxValue: PlayerProfile.defaultMaxStatValue,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  children: [
+                    _StatLine(label: 'PRESENCE', value: stats['presence'] ?? 0),
+                    _StatLine(label: 'STRENGTH', value: stats['strength'] ?? 0),
+                    _StatLine(label: 'AGILITY', value: stats['agility'] ?? 0),
+                    const SizedBox(height: 10),
+                    _StatLine(label: 'ENDURANCE', value: stats['endurance'] ?? 0),
+                    _StatLine(
+                        label: 'INTELLIGENCE',
+                        value: stats['intelligence'] ?? 0),
+                    _StatLine(
+                        label: 'DISCIPLINE', value: stats['discipline'] ?? 0),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AllocateStatsButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _AllocateStatsButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Allocate stats',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.backgroundSurface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: AppColors.neonBlue.withValues(alpha: 0.35),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.neonBlue.withValues(alpha: 0.08),
+                blurRadius: 18,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.tune_rounded,
+                size: 16,
+                color: AppColors.neonBlue.withValues(alpha: 0.9),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'ALLOCATE',
+                style: TextStyle(
+                  color: AppColors.neonBlue,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ).animate().fadeIn(duration: 350.ms).moveX(begin: 6, end: 0),
+    );
+  }
+}
+
+class _StatLine extends StatelessWidget {
+  final String label;
+  final int value;
+
+  const _StatLine({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: AppColors.textMuted.withValues(alpha: 0.95),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          Text(
+            value.toString(),
+            style: const TextStyle(
+              color: AppColors.neonBlue,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

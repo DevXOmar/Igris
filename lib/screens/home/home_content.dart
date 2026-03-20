@@ -5,15 +5,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 // responsive_framework: breakpoint-aware layout decisions (column count, padding).
 import 'package:responsive_framework/responsive_framework.dart';
+import '../../models/player_profile.dart';
+import '../../providers/progression_provider.dart';
 import '../../providers/weekly_stats_provider.dart';
 import '../../core/utils/date_utils.dart' as app_date_utils;
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
+import '../../widgets/hunter_radar_chart.dart';
 import '../../widgets/grace_tokens_display.dart';
 import '../../widgets/domain_progress_bar.dart';
 import '../../widgets/domain_tasks_bottom_sheet.dart';
 import '../../widgets/xp_level_widget.dart';
 import '../fuel_vault/vault_auth_screen.dart';
+import '../profile/stats_allocation_screen.dart';
 
 /// Home content showing weekly cumulative progress per domain as horizontal bars
 /// 
@@ -172,6 +176,89 @@ class HomeContent extends ConsumerWidget {
             ),
             
             const SliverToBoxAdapter(child: Divider(height: 1)),
+
+            // ── HUNTER STATS (radar + allocation entry) ─────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: DesignSystem.paddingAll16,
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final profile = ref.watch(progressionProvider);
+                    final stats = {
+                      ...PlayerProfile.defaultStats,
+                      ...profile.stats,
+                    };
+
+                    return Container(
+                      padding: DesignSystem.paddingAll16,
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundSurface,
+                        borderRadius: DesignSystem.radiusStandard,
+                        border: Border.all(
+                          color: AppColors.dividerColor,
+                          width: DesignSystem.borderThin,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          HunterRadarChart(
+                            stats: stats,
+                            size: 120,
+                            maxValue: PlayerProfile.defaultMaxStatValue,
+                          ),
+                          SizedBox(width: DesignSystem.spacing16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'HUNTER STATS',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                SizedBox(height: DesignSystem.spacing8),
+                                Text(
+                                  'Presence ${stats['presence'] ?? 0}  •  Strength ${stats['strength'] ?? 0}  •  Discipline ${stats['discipline'] ?? 0}',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: AppColors.textMuted),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: DesignSystem.spacing12),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.neonBlue,
+                                      side: BorderSide(
+                                        color: AppColors.neonBlue
+                                            .withValues(alpha: 0.35),
+                                      ),
+                                    ),
+                                    onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const StatsAllocationScreen(),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.tune_rounded),
+                                    label: const Text('ALLOCATE'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
             
             // Section header
             SliverToBoxAdapter(

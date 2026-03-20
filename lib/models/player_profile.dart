@@ -10,6 +10,18 @@ part 'player_profile.g.dart';
 /// instance via [copyWith] so Riverpod detects state changes correctly.
 @HiveType(typeId: 5)
 class PlayerProfile {
+  static const int defaultStatValue = 1;
+  static const int defaultMaxStatValue = 99;
+
+  static const Map<String, int> defaultStats = {
+    'presence': defaultStatValue,
+    'strength': defaultStatValue,
+    'agility': defaultStatValue,
+    'endurance': defaultStatValue,
+    'intelligence': defaultStatValue,
+    'discipline': defaultStatValue,
+  };
+
   /// Current hunter level (starts at 1).
   @HiveField(0)
   final int level;
@@ -17,6 +29,10 @@ class PlayerProfile {
   /// XP accumulated toward the NEXT level (resets on level-up).
   @HiveField(1)
   final int currentXP;
+
+  /// Lifetime XP earned (never decreases).
+  @HiveField(11)
+  final int totalXP;
 
   /// Current rank string: 'E' | 'D' | 'C' | 'B' | 'A' | 'S' | 'National' | 'Monarch'.
   @HiveField(2)
@@ -54,9 +70,24 @@ class PlayerProfile {
   @HiveField(10)
   final String name;
 
+  /// Unspent stat points earned from XP milestones.
+  @HiveField(12)
+  final int unspentStatPoints;
+
+  /// Total stat points already awarded from XP milestones.
+  ///
+  /// Stored to prevent double-awarding when loading older profiles.
+  @HiveField(13)
+  final int statPointsAwarded;
+
+  /// Hunter stats. Keys are stable strings (e.g. 'presence').
+  @HiveField(14)
+  final Map<String, int> stats;
+
   const PlayerProfile({
     this.level = 1,
     this.currentXP = 0,
+    this.totalXP = 0,
     this.rank = 'E',
     this.activeTitleIds = const [],
     this.unlockedTitleIds = const [],
@@ -66,11 +97,15 @@ class PlayerProfile {
     this.longestStreak = 0,
     this.lastStreakMilestoneAwarded = 0,
     this.name = '',
+    this.unspentStatPoints = 0,
+    this.statPointsAwarded = 0,
+    this.stats = defaultStats,
   });
 
   PlayerProfile copyWith({
     int? level,
     int? currentXP,
+    int? totalXP,
     String? rank,
     List<String>? activeTitleIds,
     List<String>? unlockedTitleIds,
@@ -80,10 +115,14 @@ class PlayerProfile {
     int? longestStreak,
     int? lastStreakMilestoneAwarded,
     String? name,
+    int? unspentStatPoints,
+    int? statPointsAwarded,
+    Map<String, int>? stats,
   }) {
     return PlayerProfile(
       level: level ?? this.level,
       currentXP: currentXP ?? this.currentXP,
+      totalXP: totalXP ?? this.totalXP,
       rank: rank ?? this.rank,
       activeTitleIds: activeTitleIds ?? this.activeTitleIds,
       unlockedTitleIds: unlockedTitleIds ?? this.unlockedTitleIds,
@@ -94,6 +133,9 @@ class PlayerProfile {
       lastStreakMilestoneAwarded:
           lastStreakMilestoneAwarded ?? this.lastStreakMilestoneAwarded,
       name: name ?? this.name,
+      unspentStatPoints: unspentStatPoints ?? this.unspentStatPoints,
+      statPointsAwarded: statPointsAwarded ?? this.statPointsAwarded,
+      stats: stats ?? this.stats,
     );
   }
 }
