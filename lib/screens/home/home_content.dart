@@ -111,9 +111,12 @@ class HomeContent extends ConsumerWidget {
                   DesignSystem.spacing12,
                 ),
                 child: HunterStatsCard(
-                  execution: _deriveExecution(profile),
-                  discipline: (profile.stats['discipline'] ?? 0),
                   presence: (profile.stats['presence'] ?? 0),
+                  strength: (profile.stats['strength'] ?? 0),
+                  agility: (profile.stats['agility'] ?? 0),
+                  endurance: (profile.stats['endurance'] ?? 0),
+                  intelligence: (profile.stats['intelligence'] ?? 0),
+                  discipline: (profile.stats['discipline'] ?? 0),
                   onAllocate: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const StatsAllocationScreen(),
@@ -584,15 +587,21 @@ class _XpBar extends StatelessWidget {
 }
 
 class HunterStatsCard extends StatelessWidget {
-  final int execution;
-  final int discipline;
   final int presence;
+  final int strength;
+  final int agility;
+  final int endurance;
+  final int intelligence;
+  final int discipline;
   final VoidCallback onAllocate;
 
   const HunterStatsCard({
-    required this.execution,
-    required this.discipline,
     required this.presence,
+    required this.strength,
+    required this.agility,
+    required this.endurance,
+    required this.intelligence,
+    required this.discipline,
     required this.onAllocate,
     super.key,
   });
@@ -641,9 +650,12 @@ class HunterStatsCard extends StatelessWidget {
                   dataSets: [
                     RadarDataSet(
                       dataEntries: [
-                        RadarEntry(value: execution.clamp(0, 99).toDouble()),
-                        RadarEntry(value: discipline.clamp(0, 99).toDouble()),
                         RadarEntry(value: presence.clamp(0, 99).toDouble()),
+                        RadarEntry(value: strength.clamp(0, 99).toDouble()),
+                        RadarEntry(value: agility.clamp(0, 99).toDouble()),
+                        RadarEntry(value: endurance.clamp(0, 99).toDouble()),
+                        RadarEntry(value: intelligence.clamp(0, 99).toDouble()),
+                        RadarEntry(value: discipline.clamp(0, 99).toDouble()),
                       ],
                       borderColor: AppColors.neonBlue.withValues(alpha: 0.85),
                       borderWidth: 2,
@@ -651,7 +663,7 @@ class HunterStatsCard extends StatelessWidget {
                       entryRadius: 2.5,
                     ),
                   ],
-                  tickCount: 3,
+                  tickCount: 4,
                   ticksTextStyle: const TextStyle(
                     color: Colors.transparent,
                     fontSize: 1,
@@ -666,17 +678,23 @@ class HunterStatsCard extends StatelessWidget {
                   ),
                   titleTextStyle: TextStyle(
                     color: AppColors.textMuted.withValues(alpha: 0.9),
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
                   getTitle: (index, angle) {
                     switch (index) {
                       case 0:
-                        return const RadarChartTitle(text: 'Execution');
-                      case 1:
-                        return const RadarChartTitle(text: 'Discipline');
-                      case 2:
                         return const RadarChartTitle(text: 'Presence');
+                      case 1:
+                        return const RadarChartTitle(text: 'Strength');
+                      case 2:
+                        return const RadarChartTitle(text: 'Agility');
+                      case 3:
+                        return const RadarChartTitle(text: 'Endurance');
+                      case 4:
+                        return const RadarChartTitle(text: 'Intelligence');
+                      case 5:
+                        return const RadarChartTitle(text: 'Discipline');
                       default:
                         return const RadarChartTitle(text: '');
                     }
@@ -690,10 +708,20 @@ class HunterStatsCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _MiniStat(label: 'Execution', value: execution, maxValue: maxV),
+                _MiniStat(label: 'Presence', value: presence, maxValue: maxV),
+                _MiniStat(label: 'Strength', value: strength, maxValue: maxV),
+                _MiniStat(label: 'Agility', value: agility, maxValue: maxV),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _MiniStat(label: 'Endurance', value: endurance, maxValue: maxV),
+                _MiniStat(
+                    label: 'Intelligence', value: intelligence, maxValue: maxV),
                 _MiniStat(
                     label: 'Discipline', value: discipline, maxValue: maxV),
-                _MiniStat(label: 'Presence', value: presence, maxValue: maxV),
               ],
             ),
             const SizedBox(height: DesignSystem.spacing16),

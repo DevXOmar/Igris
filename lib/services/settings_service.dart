@@ -1,5 +1,7 @@
 import 'package:hive/hive.dart';
 
+import '../core/utils/date_utils.dart' as app_date_utils;
+
 /// Service for managing app settings in Hive
 /// Handles grace system settings and other app configurations
 class SettingsService {
@@ -47,18 +49,29 @@ class SettingsService {
   bool needsWeeklyReset() {
     final lastReset = getLastResetDate();
     if (lastReset == null) return true;
-    
-    final now = DateTime.now();
-    final daysSinceReset = now.difference(lastReset).inDays;
-    
-    // Reset weekly (7 days)
-    return daysSinceReset >= 7;
+
+    // Weekly reset is aligned to Monday boundaries.
+    // If we've crossed into a new week since the last reset week, reset.
+    final today = app_date_utils.DateUtils.today;
+    final currentWeekStart = app_date_utils.DateUtils.getStartOfWeek(today);
+    final lastResetWeekStart =
+        app_date_utils.DateUtils.getStartOfWeek(DateTime(
+      lastReset.year,
+      lastReset.month,
+      lastReset.day,
+    ));
+
+    return currentWeekStart.isAfter(lastResetWeekStart);
   }
   
   /// Perform weekly reset of grace tokens
   Future<void> performWeeklyReset() async {
     await setRemainingGraceTokens(_maxGraceTokens);
-    await setLastResetDate(DateTime.now());
+
+    // Store the *week start* (Monday) to keep the system anchored.
+    final today = app_date_utils.DateUtils.today;
+    final weekStart = app_date_utils.DateUtils.getStartOfWeek(today);
+    await setLastResetDate(weekStart);
   }
   
   /// Auto-check and perform weekly reset if needed

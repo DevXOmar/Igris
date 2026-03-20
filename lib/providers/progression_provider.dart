@@ -142,6 +142,60 @@ class TitleUnlockContext {
     // lags too far behind.
     return minP >= 0.40 && (maxP - minP) <= 0.25;
   }
+
+  bool _isDayQualifiedForStreak(DateTime date) {
+    final log = _dailyLogService.getLogForDate(date);
+    if (log == null) return false;
+
+    // Grace always qualifies the day.
+    if (log.graceUsed) return true;
+
+    // Match the streak criteria in weekly_stats_provider:
+    // completion >= 70% across active-domain tasks.
+    final allTasks = taskState.tasks.where((task) {
+      final domain = domainState.getDomainById(task.domainId);
+      return domain != null && domain.isActive;
+    }).toList(growable: false);
+
+    if (allTasks.isEmpty) {
+      // No tasks that day — don't break the streak.
+      return true;
+    }
+
+    final completedCount =
+        allTasks.where((task) => log.isTaskCompleted(task.id)).length;
+    final completionPercentage = (completedCount / allTasks.length) * 100;
+    return completionPercentage >= 70.0;
+  }
+
+  int _graceUsedInWeek(DateTime weekStart) {
+    var used = 0;
+    for (int i = 0; i < 7; i++) {
+      final date = weekStart.add(Duration(days: i));
+      final log = _dailyLogService.getLogForDate(date);
+      if (log != null && log.graceUsed) used++;
+    }
+    return used;
+  }
+
+  bool get hasUnyieldingRythmForThreeWeeks {
+    // Interpret requirement as 21 consecutive qualified days ending today,
+    // and at most 1 grace used in each of the last 3 weeks.
+    final today = app_date_utils.DateUtils.today;
+
+    for (int i = 0; i < 21; i++) {
+      final date = today.subtract(Duration(days: i));
+      if (!_isDayQualifiedForStreak(date)) return false;
+    }
+
+    for (int w = 0; w < 3; w++) {
+      final weekRef = today.subtract(Duration(days: 7 * w));
+      final weekStart = app_date_utils.DateUtils.getStartOfWeek(weekRef);
+      if (_graceUsedInWeek(weekStart) > 1) return false;
+    }
+
+    return true;
+  }
 }
 
 // ignore: avoid_classes_with_only_static_members
@@ -193,6 +247,14 @@ class TitleDefinitions {
       unlockCondition: '30-day streak',
       icon: Icons.local_fire_department,
       checkCondition: (c) => c.profile.longestStreak >= 30,
+    ),
+    TitleDefinition(
+      id: 'unyielding_rythm',
+      name: 'The Unyielding Rythm',
+      description: 'Controlled grace. Unbroken execution. Three weeks straight.',
+      unlockCondition: 'Use at most 1 grace per week and maintain streak for 3 weeks',
+      icon: Icons.multiline_chart,
+      checkCondition: (c) => c.hasUnyieldingRythmForThreeWeeks,
     ),
     TitleDefinition(
       id: 'iron_will',

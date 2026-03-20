@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/utils/date_utils.dart' as app_date_utils;
 import '../services/settings_service.dart';
 
 /// State class for Grace token management
@@ -101,14 +102,12 @@ class GraceNotifier extends Notifier<GraceState> {
   
   /// Get the number of days until next reset
   int getDaysUntilReset() {
-    final lastReset = state.lastResetDate;
-    if (lastReset == null) return 0;
-    
-    final now = DateTime.now();
-    final daysSinceReset = now.difference(lastReset).inDays;
-    final daysUntilReset = 7 - daysSinceReset;
-    
-    return daysUntilReset > 0 ? daysUntilReset : 0;
+    // Grace resets on the next Monday (start of next week).
+    final today = app_date_utils.DateUtils.today;
+    final startOfThisWeek = app_date_utils.DateUtils.getStartOfWeek(today);
+    final startOfNextWeek = startOfThisWeek.add(const Duration(days: 7));
+    final days = startOfNextWeek.difference(today).inDays;
+    return days < 0 ? 0 : days;
   }
 }
 
