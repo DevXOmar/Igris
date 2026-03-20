@@ -17,6 +17,7 @@ import 'models/rival.dart';
 import 'models/feat.dart';
 import 'models/player_profile.dart';
 import 'screens/home/home_screen.dart';
+import 'services/demo_seed_service.dart';
 import 'widgets/animations/animation_overlay.dart';
 
 class _AppScrollBehavior extends MaterialScrollBehavior {
@@ -63,6 +64,10 @@ void main() async {
   await Hive.openBox<Rival>('rivalsBox');
   await Hive.openBox('settingsBox');
   await Hive.openBox<PlayerProfile>('playerProfileBox');
+
+  const bool enableDemoSeed =
+      bool.fromEnvironment('IGRIS_DEMO_SEED', defaultValue: false);
+  await DemoSeedService.maybeSeed(enabled: enableDemoSeed);
   
   runApp(
     // ProviderScope is required for Riverpod

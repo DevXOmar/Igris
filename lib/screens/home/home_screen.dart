@@ -24,7 +24,7 @@ class HomeScreen extends ConsumerWidget {
           _getBody(navState.currentIndex),
           // Persistent settings icon in the top-right corner, aligned with
           // the AppBar actions area of each inner screen.
-          if (navState.currentIndex != 4)
+          if (navState.currentIndex != 4 && navState.currentIndex != 0)
             SafeArea(
               child: Align(
                 alignment: Alignment.topRight,

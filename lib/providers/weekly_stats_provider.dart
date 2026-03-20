@@ -37,6 +37,8 @@ class WeeklyStats {
 final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
   final domainState = ref.watch(domainProvider);
   final taskState = ref.watch(taskProvider);
+  // Depend on daily log state so weekly stats recompute when tasks are toggled.
+  ref.watch(dailyLogProvider);
   final logNotifier = ref.watch(dailyLogProvider.notifier);
   
   final today = app_date_utils.DateUtils.today;

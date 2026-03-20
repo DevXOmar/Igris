@@ -49,6 +49,9 @@ dependencies:
   # Progress / XP visuals — circular and linear percent indicators
   percent_indicator: ^4.2.3
 
+  # Charts — Radar chart for Hunter Stats
+  fl_chart: ^0.69.0
+
   # Premium fonts — Orbitron (rank/level display) + Rajdhani (UI text)
   google_fonts: ^6.1.0
 
