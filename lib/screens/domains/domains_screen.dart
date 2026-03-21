@@ -8,6 +8,7 @@ import '../../providers/domain_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../models/domain.dart';
 import '../../models/task.dart';
+import '../../core/utils/domain_stat_weights.dart';
 import '../../widgets/ui/igris_ui.dart';
 import '../../widgets/layout/igris_screen_scaffold.dart';
 
@@ -19,6 +20,144 @@ import '../../widgets/layout/igris_screen_scaffold.dart';
 /// - Subtle highlight glow when progress >= 90%
 class DomainsScreen extends ConsumerWidget {
   const DomainsScreen({super.key});
+
+  Future<Map<String, double>?> _showAdjustMappingSheet(
+    BuildContext context, {
+    required Map<String, double> initial,
+  }) {
+    final initialNormalized = normalizeStatWeights(initial);
+    final weights = <String, double>{
+      for (final k in kCoreStatKeys) k: 0.0,
+      ...initialNormalized,
+    };
+
+    return showModalBottomSheet<Map<String, double>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            int activeCount() =>
+                weights.values.where((v) => v > 0.0).length;
+
+            double sum() =>
+                weights.values.fold(0.0, (a, b) => a + b);
+
+            void onChanged(String key, double value) {
+              final currentlyActive = weights.entries
+                  .where((e) => e.key != key && e.value > 0.0)
+                  .length;
+              final nextActive = currentlyActive + (value > 0.0 ? 1 : 0);
+              if (value > 0.0 && nextActive > 3 && weights[key] == 0.0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Max 3 stats per domain.'),
+                  ),
+                );
+                return;
+              }
+              setState(() {
+                weights[key] = value;
+              });
+            }
+
+            final total = sum();
+            final normalizedPreview = normalizeStatWeights(weights);
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Adjust Mapping',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Select up to 3 stats. Total should be 1.0 (auto-normalized on save).',
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final key in kCoreStatKeys) ...[
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 110,
+                          child: Text(formatStatKey(key)),
+                        ),
+                        Expanded(
+                          child: Slider(
+                            value: weights[key]!.clamp(0.0, 1.0),
+                            min: 0.0,
+                            max: 1.0,
+                            divisions: 20,
+                            label: weights[key]!.toStringAsFixed(2),
+                            onChanged: (v) => onChanged(key, v),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 44,
+                          child: Text(
+                            weights[key]!.toStringAsFixed(2),
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Text(
+                    'Selected: ${activeCount()}/3   Raw total: ${total.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: topStatKeys(normalizedPreview).map((k) {
+                      final pct =
+                          (normalizedPreview[k]! * 100).toStringAsFixed(0);
+                      return Chip(
+                        label: Text('${formatStatKey(k)} $pct%'),
+                      );
+                    }).toList(growable: false),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(null),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context)
+                                .pop(normalizeStatWeights(weights));
+                          },
+                          child: const Text('Save'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -122,29 +261,43 @@ class DomainsScreen extends ConsumerWidget {
                       ),
                       subtitle: Padding(
                         padding: EdgeInsets.only(top: DesignSystem.spacing4),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              domain.isActive ? Icons.check_circle : Icons.cancel,
-                              size: 14,
-                              color: domain.isActive 
-                                  ? AppColors.neonBlue
-                                  : AppColors.textMuted,
+                            Row(
+                              children: [
+                                Icon(
+                                  domain.isActive ? Icons.check_circle : Icons.cancel,
+                                  size: 14,
+                                  color: domain.isActive
+                                      ? AppColors.neonBlue
+                                      : AppColors.textMuted,
+                                ),
+                                SizedBox(width: DesignSystem.spacing4),
+                                Text(
+                                  domain.isActive ? 'Active' : 'Inactive',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                SizedBox(width: DesignSystem.spacing16),
+                                Text(
+                                  '${domainTasks.length} tasks',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
                             ),
-                            SizedBox(width: DesignSystem.spacing4),
+                            SizedBox(height: DesignSystem.spacing4),
                             Text(
-                              domain.isActive ? 'Active' : 'Inactive',
+                              'Contributes to: ${topStatKeys(domain.statWeights).map(formatStatKey).join(', ')}',
                               style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 14,
-                              ),
-                            ),
-                            SizedBox(width: DesignSystem.spacing16),
-                            Text(
-                              '${domainTasks.length} tasks',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 14,
+                                color: AppColors.textMuted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -292,6 +445,8 @@ class DomainsScreen extends ConsumerWidget {
     
     final nameController = TextEditingController();
     bool showCustomInput = false;
+    String? pendingName;
+    Map<String, double>? pendingWeights;
     
     showDialog(
       context: context,
@@ -306,6 +461,63 @@ class DomainsScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (pendingName != null && pendingWeights != null) ...[
+                    const Text(
+                      'This domain contributes to:',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: topStatKeys(pendingWeights!).map((k) {
+                        return Chip(
+                          label: Text('${formatStatKey(k)} ↑'),
+                        );
+                      }).toList(growable: false),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () async {
+                              final adjusted = await _showAdjustMappingSheet(
+                                context,
+                                initial: pendingWeights!,
+                              );
+                              if (adjusted == null) return;
+                              setState(() {
+                                pendingWeights = adjusted;
+                              });
+                            },
+                            child: const Text('Adjust Mapping'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final name = pendingName!.trim();
+                              final domain = Domain(
+                                id: const Uuid().v4(),
+                                name: name,
+                                strength: 0,
+                                isActive: true,
+                                statWeights: pendingWeights,
+                              );
+                              ref.read(domainProvider.notifier).addDomain(domain);
+                              Navigator.pop(context);
+                            },
+                            child: const Text('Create Domain'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                  ],
                   if (!showCustomInput) ...[
                     const Text(
                       'Select a preset or add custom:',
@@ -320,14 +532,10 @@ class DomainsScreen extends ConsumerWidget {
                         return ActionChip(
                           label: Text(name),
                           onPressed: () {
-                            final domain = Domain(
-                              id: const Uuid().v4(),
-                              name: name,
-                              strength: 0,
-                              isActive: true,
-                            );
-                            ref.read(domainProvider.notifier).addDomain(domain);
-                            Navigator.pop(context);
+                            setState(() {
+                              pendingName = name;
+                              pendingWeights = inferStatWeights(name);
+                            });
                           },
                         );
                       }).toList(),
@@ -364,18 +572,29 @@ class DomainsScreen extends ConsumerWidget {
                       autofocus: true,
                       onSubmitted: (value) {
                         if (value.trim().isNotEmpty) {
-                          final domain = Domain(
-                            id: const Uuid().v4(),
-                            name: value.trim(),
-                            strength: 0,
-                            isActive: true,
-                          );
-                          ref.read(domainProvider.notifier).addDomain(domain);
-                          Navigator.pop(context);
+                          setState(() {
+                            pendingName = value.trim();
+                            pendingWeights = inferStatWeights(value.trim());
+                          });
                         }
                       },
                     ),
                     const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final value = nameController.text.trim();
+                          if (value.isEmpty) return;
+                          setState(() {
+                            pendingName = value;
+                            pendingWeights = inferStatWeights(value);
+                          });
+                        },
+                        child: const Text('Preview Mapping'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     TextButton.icon(
                       icon: const Icon(Icons.arrow_back),
                       label: const Text('Back to presets'),
@@ -383,6 +602,8 @@ class DomainsScreen extends ConsumerWidget {
                         setState(() {
                           showCustomInput = false;
                           nameController.clear();
+                          pendingName = null;
+                          pendingWeights = null;
                         });
                       },
                     ),
@@ -396,22 +617,6 @@ class DomainsScreen extends ConsumerWidget {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
-            if (showCustomInput)
-              TextButton(
-                onPressed: () {
-                  if (nameController.text.trim().isNotEmpty) {
-                    final domain = Domain(
-                      id: const Uuid().v4(),
-                      name: nameController.text.trim(),
-                      strength: 0,
-                      isActive: true,
-                    );
-                    ref.read(domainProvider.notifier).addDomain(domain);
-                    Navigator.pop(context);
-                  }
-                },
-                child: const Text('Add'),
-              ),
           ],
         ),
       ),

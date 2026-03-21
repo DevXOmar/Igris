@@ -690,6 +690,9 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   static const int _xpPerStatPoint = 250;
   static const int _maxStatValue = PlayerProfile.defaultMaxStatValue;
 
+  // Domain → stat contribution: base stat growth per task completion.
+  static const double _taskStatGainUnits = 1.0;
+
   static const double _maxAdditiveXpBonus = 0.50;
 
   final ProgressionService _service = ProgressionService();
@@ -841,6 +844,154 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     return max(0.0, bonus);
   }
 
+  double _allStatsBonusPercentForGains(PlayerProfile profile) {
+    double bonus = 0.0;
+    for (final id in profile.equippedTitleIds) {
+      final def = TitleDefinitions.findById(id);
+      if (def == null) continue;
+      for (final e in def.effects) {
+        if (e.type == TitleEffectType.allStatsBonus) bonus += e.percent;
+      }
+    }
+    return max(0.0, bonus);
+  }
+
+  Map<String, double> _statBonusPercentByKeyForGains(PlayerProfile profile) {
+    final out = <String, double>{
+      for (final k in PlayerProfile.defaultStats.keys) k: 0.0,
+    };
+    for (final id in profile.equippedTitleIds) {
+      final def = TitleDefinitions.findById(id);
+      if (def == null) continue;
+      for (final e in def.effects) {
+        if (e.type != TitleEffectType.statBonus) continue;
+        final key = e.statKey;
+        if (key == null) continue;
+        if (!out.containsKey(key)) continue;
+        out[key] = (out[key] ?? 0.0) + e.percent;
+      }
+    }
+    return out;
+  }
+
+  int _fnv1a32(String input) {
+    const int fnvPrime = 0x01000193;
+    int hash = 0x811c9dc5;
+    for (final c in input.codeUnits) {
+      hash ^= c;
+      hash = (hash * fnvPrime) & 0xFFFFFFFF;
+    }
+    return hash & 0xFFFFFFFF;
+  }
+
+  double _stableUnitDouble(String seed) {
+    // Map a stable 32-bit hash onto [0, 1).
+    final h = _fnv1a32(seed);
+    return h / 4294967296.0;
+  }
+
+  Map<String, double> _normalizedDomainWeights(Domain domain) {
+    final filtered = <String, double>{};
+    for (final e in domain.statWeights.entries) {
+      final k = e.key;
+      final v = e.value;
+      if (!PlayerProfile.defaultStats.containsKey(k)) continue;
+      if (v <= 0) continue;
+      filtered[k] = v;
+    }
+
+    if (filtered.isEmpty) {
+      return const {
+        'discipline': 0.5,
+        'intelligence': 0.5,
+      };
+    }
+
+    final sum = filtered.values.fold<double>(0.0, (a, b) => a + b);
+    if (sum <= 0.0) {
+      return const {
+        'discipline': 0.5,
+        'intelligence': 0.5,
+      };
+    }
+
+    return {
+      for (final e in filtered.entries) e.key: e.value / sum,
+    };
+  }
+
+  Map<String, int> _computeTaskStatGains({
+    required PlayerProfile profile,
+    required Domain domain,
+    required String taskId,
+    required DateTime date,
+  }) {
+    if (_taskStatGainUnits <= 0.0) return const {};
+
+    final weights = _normalizedDomainWeights(domain);
+    final allBonus = _allStatsBonusPercentForGains(profile);
+    final byKeyBonus = _statBonusPercentByKeyForGains(profile);
+
+    final gains = <String, int>{};
+    var total = 0;
+    for (final e in weights.entries) {
+      final key = e.key;
+      final weight = e.value;
+      final base = _taskStatGainUnits * weight;
+      final bonus = allBonus + (byKeyBonus[key] ?? 0.0);
+      final adjusted = base * (1.0 + max(0.0, bonus));
+
+      final whole = adjusted.floor();
+      final frac = adjusted - whole;
+      var inc = whole;
+      if (frac > 0.0) {
+        final seed = '${domain.id}|$taskId|${date.toIso8601String()}|$key';
+        if (_stableUnitDouble(seed) < frac) inc += 1;
+      }
+      if (inc <= 0) continue;
+      gains[key] = (gains[key] ?? 0) + inc;
+      total += inc;
+    }
+
+    if (total > 0) return gains;
+
+    // Guarantee at least one stat point when weights exist.
+    String? bestKey;
+    var bestScore = -1.0;
+    for (final e in weights.entries) {
+      final key = e.key;
+      final weight = e.value;
+      final bonus = allBonus + (byKeyBonus[key] ?? 0.0);
+      final score = weight * (1.0 + max(0.0, bonus));
+      if (score > bestScore) {
+        bestScore = score;
+        bestKey = key;
+      }
+    }
+    if (bestKey == null) return const {};
+    return {bestKey: 1};
+  }
+
+  Map<String, int> _applyStatGains(
+    Map<String, int> current,
+    Map<String, int> gains,
+  ) {
+    if (gains.isEmpty) return current;
+    final next = <String, int>{
+      ...PlayerProfile.defaultStats,
+      ...current,
+    };
+    for (final e in gains.entries) {
+      final key = e.key;
+      final inc = e.value;
+      if (!next.containsKey(key)) continue;
+      final base = next[key] ?? PlayerProfile.defaultStatValue;
+      final updated = (base + inc).clamp(0, _maxStatValue);
+      next[key] = updated;
+    }
+    return next;
+  }
+
   // ── Formula: requiredXP = baseXP * level^1.5 ────────────────────────────
 
   /// XP required to advance FROM [level] to [level]+1.
@@ -857,8 +1008,20 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     required String taskId,
     required String domainId,
   }) async {
+    final domain = ref.read(domainProvider).getDomainById(domainId);
+    final today = app_date_utils.DateUtils.today;
+    final gains = domain == null
+        ? const <String, int>{}
+        : _computeTaskStatGains(
+            profile: state,
+            domain: domain,
+            taskId: taskId,
+            date: today,
+          );
+
     var profile = state.copyWith(
       totalTasksCompleted: state.totalTasksCompleted + 1,
+      stats: _applyStatGains(state.stats, gains),
     );
     await _service.saveProfile(profile);
     state = profile;
@@ -870,8 +1033,6 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     } catch (_) {
       task = null;
     }
-    final domain = ref.read(domainProvider).getDomainById(domainId);
-
     final base = XpRewards.taskComplete;
     final bonus = task == null
         ? 0.0
