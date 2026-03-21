@@ -110,6 +110,71 @@ class PlayerProfile {
     this.stats = defaultStats,
   });
 
+  Map<String, dynamic> toJson() => {
+        'level': level,
+        'currentXP': currentXP,
+        'totalXP': totalXP,
+        'rank': rank,
+        'activeTitleIds': activeTitleIds,
+        'equippedTitleIds': equippedTitleIds,
+        'unlockedTitleIds': unlockedTitleIds,
+        'feats': feats.map((f) => f.toJson()).toList(),
+        'totalTasksCompleted': totalTasksCompleted,
+        'weeklyGoalsCompleted': weeklyGoalsCompleted,
+        'longestStreak': longestStreak,
+        'lastStreakMilestoneAwarded': lastStreakMilestoneAwarded,
+        'name': name,
+        'unspentStatPoints': unspentStatPoints,
+        'statPointsAwarded': statPointsAwarded,
+        'stats': stats,
+      };
+
+  factory PlayerProfile.fromJson(Map<String, dynamic> json) {
+    final featsJson = json['feats'];
+    final feats = (featsJson is List)
+        ? featsJson
+            .whereType<Map>()
+            .map((e) => Feat.fromJson(Map<String, dynamic>.from(e)))
+            .toList()
+        : const <Feat>[];
+
+    final statsJson = json['stats'];
+    final stats = (statsJson is Map)
+        ? statsJson.map(
+            (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+          )
+        : Map<String, int>.from(PlayerProfile.defaultStats);
+
+    return PlayerProfile(
+      level: (json['level'] as num?)?.toInt() ?? 1,
+      currentXP: (json['currentXP'] as num?)?.toInt() ?? 0,
+      totalXP: (json['totalXP'] as num?)?.toInt() ?? 0,
+      rank: (json['rank'] as String?) ?? 'E',
+      activeTitleIds:
+          (json['activeTitleIds'] as List?)?.whereType<String>().toList() ??
+              const <String>[],
+      equippedTitleIds:
+          (json['equippedTitleIds'] as List?)?.whereType<String>().toList() ??
+              const <String>[],
+      unlockedTitleIds:
+          (json['unlockedTitleIds'] as List?)?.whereType<String>().toList() ??
+              const <String>[],
+      feats: feats,
+      totalTasksCompleted: (json['totalTasksCompleted'] as num?)?.toInt() ?? 0,
+      weeklyGoalsCompleted: (json['weeklyGoalsCompleted'] as num?)?.toInt() ?? 0,
+      longestStreak: (json['longestStreak'] as num?)?.toInt() ?? 0,
+      lastStreakMilestoneAwarded:
+          (json['lastStreakMilestoneAwarded'] as num?)?.toInt() ?? 0,
+      name: (json['name'] as String?) ?? '',
+      unspentStatPoints: (json['unspentStatPoints'] as num?)?.toInt() ?? 0,
+      statPointsAwarded: (json['statPointsAwarded'] as num?)?.toInt() ?? 0,
+      stats: {
+        ...PlayerProfile.defaultStats,
+        ...stats,
+      },
+    );
+  }
+
   PlayerProfile copyWith({
     int? level,
     int? currentXP,

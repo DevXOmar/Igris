@@ -1,21 +1,24 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:hive/hive.dart';
 
 import 'backup_platform.dart';
+import 'backup_migration_service.dart';
 import 'platform_info.dart';
 
 import '../models/daily_log.dart';
 import '../models/domain.dart';
 import '../models/fuel_vault_entry.dart';
+import '../models/player_profile.dart';
 import '../models/rival.dart';
 import '../models/task.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
 
 /// Current schema version.  Increment this when the backup JSON structure
 /// changes and add a matching migration branch inside [runMigration].
-const int schemaVersion = 1;
+const int schemaVersion = 2;
 
 /// Backup metadata `appVersion`.
 ///
@@ -35,6 +38,19 @@ class BackupService {
   static const _rivalsBox = 'rivalsBox';
   static const _fuelVaultBox = 'fuelVaultBox';
   static const _settingsBox = 'settingsBox';
+  static const _playerProfileBox = 'playerProfileBox';
+  static const _playerProfileKey = 'profile';
+
+  final BackupMigrationService _migrationService = BackupMigrationService();
+
+  void _log(String message, {Object? error, StackTrace? stackTrace}) {
+    developer.log(
+      message,
+      name: 'BackupService',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
 
   // ── Export ─────────────────────────────────────────────────────────────────
 
@@ -43,17 +59,15 @@ class BackupService {
   ///
   /// Returns the absolute path of the written file.
   Future<String> exportBackup() async {
-    final domains =
-        Hive.box<Domain>(_domainsBox).values.map((d) => d.toJson()).toList();
+    final domainObjects = Hive.box<Domain>(_domainsBox).values.toList();
+    final taskObjects = Hive.box<Task>(_tasksBox).values.toList();
+    final logObjects = Hive.box<DailyLog>(_dailyLogsBox).values.toList();
+    final rivalObjects = Hive.box<Rival>(_rivalsBox).values.toList();
 
-    final tasks =
-        Hive.box<Task>(_tasksBox).values.map((t) => t.toJson()).toList();
-
-    final dailyLogs =
-        Hive.box<DailyLog>(_dailyLogsBox).values.map((l) => l.toJson()).toList();
-
-    final rivals =
-        Hive.box<Rival>(_rivalsBox).values.map((r) => r.toJson()).toList();
+    final domains = domainObjects.map((d) => d.toJson()).toList();
+    final tasks = taskObjects.map((t) => t.toJson()).toList();
+    final dailyLogs = logObjects.map((l) => l.toJson()).toList();
+    final rivals = rivalObjects.map((r) => r.toJson()).toList();
 
     final fuelVault = <Map<String, dynamic>>[];
     for (final entry in Hive.box<FuelVaultEntry>(_fuelVaultBox).values) {
@@ -80,8 +94,19 @@ class BackupService {
       settings[key] = encoded;
     }
 
+    final profile =
+        Hive.box<PlayerProfile>(_playerProfileBox).get(_playerProfileKey) ??
+            const PlayerProfile();
+
+    final weeklyStats = _buildWeeklyStatsSnapshot(
+      domains: domainObjects,
+      tasks: taskObjects,
+      dailyLogs: logObjects,
+    );
+
     final payload = <String, dynamic>{
-      'version': schemaVersion,
+      'schemaVersion': schemaVersion,
+      'version': schemaVersion, // legacy alias
       'appVersion': backupAppVersion,
       'timestamp': DateTime.now().toUtc().toIso8601String(),
       'device': getBackupDevice(),
@@ -92,6 +117,8 @@ class BackupService {
         'dailyLogs': dailyLogs,
         'rivals': rivals,
         'fuelVault': fuelVault,
+        'playerProfile': profile.toJson(),
+        'weeklyStats': weeklyStats,
       },
     };
 
@@ -103,6 +130,168 @@ class BackupService {
     return saveBackupFile(jsonEncode(payload), fileName);
   }
 
+  Map<String, dynamic> _buildWeeklyStatsSnapshot({
+    required List<Domain> domains,
+    required List<Task> tasks,
+    required List<DailyLog> dailyLogs,
+  }) {
+    final today = app_date_utils.DateUtils.today;
+    final startOfWeek = app_date_utils.DateUtils.getStartOfWeek(today);
+
+    // Build fast lookup: dateKey -> DailyLog
+    final logsByKey = <String, DailyLog>{
+      for (final l in dailyLogs)
+        app_date_utils.DateUtils.getDateKey(l.date): l,
+    };
+
+    final activeDomainIds = domains.where((d) => d.isActive).map((d) => d.id).toSet();
+    final activeTasks = tasks.where((t) => activeDomainIds.contains(t.domainId)).toList();
+
+    int totalTasksThisWeek = 0;
+    int completedTasksThisWeek = 0;
+    int graceUsedThisWeek = 0;
+
+    for (var i = 0; i < 7; i++) {
+      final date = startOfWeek.add(Duration(days: i));
+      if (date.isAfter(today)) continue;
+      final key = app_date_utils.DateUtils.getDateKey(date);
+      final log = logsByKey[key];
+      if (log?.graceUsed == true) graceUsedThisWeek++;
+    }
+
+    // Per-domain snapshot: { domainId: progress0to1 }
+    final progressByDomain = <String, double>{};
+    for (final domain in domains.where((d) => d.isActive)) {
+      final domainTasks = tasks.where((t) => t.domainId == domain.id).toList();
+      if (domainTasks.isEmpty) {
+        progressByDomain[domain.id] = 0.0;
+        continue;
+      }
+
+      final domainTotalForWeek = domainTasks.length * 7;
+      totalTasksThisWeek += domainTotalForWeek;
+
+      var domainCompletedThisWeek = 0;
+      for (var i = 0; i < 7; i++) {
+        final date = startOfWeek.add(Duration(days: i));
+        if (date.isAfter(today)) continue;
+        final key = app_date_utils.DateUtils.getDateKey(date);
+        final log = logsByKey[key];
+        for (final task in domainTasks) {
+          if (log != null && log.isTaskCompleted(task.id)) {
+            domainCompletedThisWeek++;
+            completedTasksThisWeek++;
+          }
+        }
+      }
+
+      progressByDomain[domain.id] =
+          domainTotalForWeek > 0 ? domainCompletedThisWeek / domainTotalForWeek : 0.0;
+    }
+
+    final weeklyScore = totalTasksThisWeek > 0
+        ? (completedTasksThisWeek / totalTasksThisWeek) * 100
+        : 0.0;
+
+    final currentStreak = _calculateStreak(
+      today: today,
+      activeTasks: activeTasks,
+      logsByKey: logsByKey,
+    );
+
+    return {
+      'weeklyScore': weeklyScore,
+      'currentStreak': currentStreak,
+      'totalTasksThisWeek': totalTasksThisWeek,
+      'completedTasksThisWeek': completedTasksThisWeek,
+      'graceUsedThisWeek': graceUsedThisWeek,
+      'progressByDomain': progressByDomain,
+    };
+  }
+
+  int _calculateStreak({
+    required DateTime today,
+    required List<Task> activeTasks,
+    required Map<String, DailyLog> logsByKey,
+  }) {
+    if (activeTasks.isEmpty) return 0;
+
+    var streak = 0;
+    var checkDate = today;
+
+    const int maxLookbackDays = 3660;
+    var lookedBack = 0;
+
+    while (true) {
+      if (lookedBack++ >= maxLookbackDays) break;
+      final key = app_date_utils.DateUtils.getDateKey(checkDate);
+      final log = logsByKey[key];
+
+      if (log?.graceUsed == true) {
+        streak++;
+        checkDate = checkDate.subtract(const Duration(days: 1));
+        continue;
+      }
+
+      final completedCount = activeTasks
+          .where((task) => log?.isTaskCompleted(task.id) ?? false)
+          .length;
+
+      final completionPercentage = (completedCount / activeTasks.length) * 100;
+      if (completionPercentage >= 70.0) {
+        streak++;
+        checkDate = checkDate.subtract(const Duration(days: 1));
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }
+
+  // ── Preview ───────────────────────────────────────────────────────────────
+
+  /// Picks a backup file and returns a parsed preview summary.
+  ///
+  /// Returns `null` if the user cancels the picker.
+  Future<BackupPreview?> pickBackupPreview() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      withData: true,
+    );
+    if (result == null) return null;
+    final raw = await readPickedBackupFile(result);
+    return previewBackup(raw);
+  }
+
+  /// Parses [jsonContent], migrates to latest schema, and returns a summary.
+  BackupPreview previewBackup(String jsonContent) {
+    final envelope = validateBackup(jsonContent);
+    final data = Map<String, dynamic>.from(envelope['data'] as Map);
+
+    final profileJson = data['playerProfile'];
+    final profile = (profileJson is Map)
+        ? PlayerProfile.fromJson(Map<String, dynamic>.from(profileJson))
+        : const PlayerProfile();
+
+    return BackupPreview(
+      envelope: envelope,
+      schemaVersion: envelope['schemaVersion'] as int,
+      timestampUtc: envelope['timestamp'] as String,
+      device: envelope['device'] as String,
+      appVersion: envelope['appVersion'] as String,
+      domainsCount: (data['domains'] as List).length,
+      tasksCount: (data['tasks'] as List).length,
+      dailyLogsCount: (data['dailyLogs'] as List).length,
+      rivalsCount: (data['rivals'] as List).length,
+      fuelVaultCount: (data['fuelVault'] as List).length,
+      profileLevel: profile.level,
+      profileRank: profile.rank,
+      profileName: profile.name,
+    );
+  }
+
   // ── Restore ────────────────────────────────────────────────────────────────
 
   /// Opens the system file picker, validates the selected file, migrates if
@@ -111,90 +300,51 @@ class BackupService {
   /// Throws a [BackupException] with a human-readable message on any failure
   /// so the UI can display it without inspecting raw exception types.
   Future<void> restoreBackup() async {
-    // 1. Pick file
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-      withData: true, // ensures bytes are available on web
-    );
-    if (result == null) {
-      // User cancelled — treat as no-op
-      return;
-    }
+    final preview = await pickBackupPreview();
+    if (preview == null) return;
+    await restoreFromEnvelope(preview.envelope);
+  }
 
-    final raw = await readPickedBackupFile(result);
-
-    // 2. Validate
-    Map<String, dynamic> data;
+  /// Restores from a pre-validated, migrated envelope. This is the recommended
+  /// entrypoint when the UI already showed a preview/confirmation.
+  Future<void> restoreFromEnvelope(Map<String, dynamic> envelope) async {
     try {
-      data = validateBackup(raw);
-    } catch (e) {
-      throw BackupException('Invalid backup file: $e');
+      await _restoreAtomic(envelope);
+    } catch (e, st) {
+      _log('Restore failed', error: e, stackTrace: st);
+      if (e is BackupException) rethrow;
+      throw BackupException('Restore failed: $e');
     }
+  }
 
-    // 3. Migrate if needed
-    final backupVersion = data['version'] as int;
-    if (backupVersion < schemaVersion) {
-      data = runMigration(data, backupVersion);
-    }
+  Future<void> _restoreAtomic(Map<String, dynamic> envelope) async {
+    final restoredData = Map<String, dynamic>.from(envelope['data'] as Map);
+    final settingsRaw = (envelope['settings'] is Map)
+        ? Map<String, dynamic>.from(envelope['settings'] as Map)
+        : <String, dynamic>{};
 
-    final restored = data['data'] as Map<String, dynamic>;
-    final hasSettings = data['settings'] is Map;
-    final settings = hasSettings
-      ? Map<String, dynamic>.from(data['settings'] as Map)
-      : <String, dynamic>{};
+    // Pre-parse everything before touching local data.
+    final domains = (restoredData['domains'] as List)
+        .map((e) => Domain.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    final tasks = (restoredData['tasks'] as List)
+        .map((e) => Task.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    final dailyLogs = (restoredData['dailyLogs'] as List)
+        .map((e) => DailyLog.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+    final rivals = (restoredData['rivals'] as List)
+        .map((e) => Rival.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
 
-    // 4. Clear all boxes
-    await Hive.box<Domain>(_domainsBox).clear();
-    await Hive.box<Task>(_tasksBox).clear();
-    await Hive.box<DailyLog>(_dailyLogsBox).clear();
-    await Hive.box<Rival>(_rivalsBox).clear();
-    await Hive.box<FuelVaultEntry>(_fuelVaultBox).clear();
+    final profileJson = restoredData['playerProfile'];
+    final profile = (profileJson is Map)
+        ? PlayerProfile.fromJson(Map<String, dynamic>.from(profileJson))
+        : const PlayerProfile();
 
-    // 4b. Restore settings (only if present in backup)
-    if (hasSettings) {
-      await Hive.box(_settingsBox).clear();
-      final settingsBox = Hive.box(_settingsBox);
-      for (final entry in settings.entries) {
-        final key = entry.key;
-        final decoded = _decodeSettingValue(entry.value);
-        if (decoded == null) {
-          await settingsBox.delete(key);
-        } else {
-          await settingsBox.put(key, decoded);
-        }
-      }
-    }
-
-    // 5. Restore
-    final domainsBox = Hive.box<Domain>(_domainsBox);
-    for (final json in restored['domains'] as List<dynamic>) {
-      final d = Domain.fromJson(json as Map<String, dynamic>);
-      await domainsBox.put(d.id, d);
-    }
-
-    final tasksBox = Hive.box<Task>(_tasksBox);
-    for (final json in restored['tasks'] as List<dynamic>) {
-      final t = Task.fromJson(json as Map<String, dynamic>);
-      await tasksBox.put(t.id, t);
-    }
-
-    final dailyLogsBox = Hive.box<DailyLog>(_dailyLogsBox);
-    for (final json in restored['dailyLogs'] as List<dynamic>) {
-      final l = DailyLog.fromJson(json as Map<String, dynamic>);
-      final key = app_date_utils.DateUtils.getDateKey(l.date);
-      await dailyLogsBox.put(key, l);
-    }
-
-    final rivalsBox = Hive.box<Rival>(_rivalsBox);
-    for (final json in restored['rivals'] as List<dynamic>) {
-      final r = Rival.fromJson(json as Map<String, dynamic>);
-      await rivalsBox.put(r.id, r);
-    }
-
-    final fuelVaultBox = Hive.box<FuelVaultEntry>(_fuelVaultBox);
-    for (final json in restored['fuelVault'] as List<dynamic>) {
-      final map = Map<String, dynamic>.from(json as Map);
+    final fuelVaultEntries = <FuelVaultEntry>[];
+    for (final raw in (restoredData['fuelVault'] as List)) {
+      final map = Map<String, dynamic>.from(raw as Map);
 
       final imageBytesBase64 = map['imageBytesBase64'];
       if (imageBytesBase64 is String && imageBytesBase64.isNotEmpty) {
@@ -211,13 +361,167 @@ class BackupService {
             imageFileName,
           );
           map['imagePath'] = newPath;
-        } catch (_) {
-          // Best-effort: keep whatever imagePath was stored in the backup.
+        } catch (e, st) {
+          _log('Fuel Vault image restore failed (best-effort)', error: e, stackTrace: st);
         }
       }
 
-      final e = FuelVaultEntry.fromJson(map);
-      await fuelVaultBox.put(e.id, e);
+      fuelVaultEntries.add(FuelVaultEntry.fromJson(map));
+    }
+
+    final decodedSettings = <String, Object?>{};
+    for (final entry in settingsRaw.entries) {
+      final key = entry.key;
+      final decoded = _decodeSettingValue(entry.value);
+      decodedSettings[key] = decoded;
+    }
+
+    // Snapshot current state for rollback (JSON-based).
+    final oldDomains = Hive.box<Domain>(_domainsBox).values.map((e) => e.toJson()).toList();
+    final oldTasks = Hive.box<Task>(_tasksBox).values.map((e) => e.toJson()).toList();
+    final oldDailyLogs = Hive.box<DailyLog>(_dailyLogsBox).values.map((e) => e.toJson()).toList();
+    final oldRivals = Hive.box<Rival>(_rivalsBox).values.map((e) => e.toJson()).toList();
+    final oldFuelVault = Hive.box<FuelVaultEntry>(_fuelVaultBox).values.map((e) => e.toJson()).toList();
+    final oldProfile =
+        Hive.box<PlayerProfile>(_playerProfileBox).get(_playerProfileKey)?.toJson();
+
+    final oldSettingsBox = Hive.box(_settingsBox);
+    final oldSettings = <String, dynamic>{};
+    for (final key in oldSettingsBox.keys) {
+      if (key is! String) continue;
+      oldSettings[key] = _encodeSettingValue(oldSettingsBox.get(key));
+    }
+
+    try {
+      // Clear boxes.
+      await Hive.box<Domain>(_domainsBox).clear();
+      await Hive.box<Task>(_tasksBox).clear();
+      await Hive.box<DailyLog>(_dailyLogsBox).clear();
+      await Hive.box<Rival>(_rivalsBox).clear();
+      await Hive.box<FuelVaultEntry>(_fuelVaultBox).clear();
+      await Hive.box<PlayerProfile>(_playerProfileBox).clear();
+      await Hive.box(_settingsBox).clear();
+
+      // Restore settings.
+      final settingsBox = Hive.box(_settingsBox);
+      for (final entry in decodedSettings.entries) {
+        final key = entry.key;
+        final value = entry.value;
+        if (value == null) {
+          await settingsBox.delete(key);
+        } else {
+          await settingsBox.put(key, value);
+        }
+      }
+
+      // Restore data.
+      final domainsBox = Hive.box<Domain>(_domainsBox);
+      for (final d in domains) {
+        await domainsBox.put(d.id, d);
+      }
+
+      final tasksBox = Hive.box<Task>(_tasksBox);
+      for (final t in tasks) {
+        await tasksBox.put(t.id, t);
+      }
+
+      final dailyLogsBox = Hive.box<DailyLog>(_dailyLogsBox);
+      for (final l in dailyLogs) {
+        final key = app_date_utils.DateUtils.getDateKey(l.date);
+        await dailyLogsBox.put(key, l);
+      }
+
+      final rivalsBox = Hive.box<Rival>(_rivalsBox);
+      for (final r in rivals) {
+        await rivalsBox.put(r.id, r);
+      }
+
+      final fuelVaultBox = Hive.box<FuelVaultEntry>(_fuelVaultBox);
+      for (final e in fuelVaultEntries) {
+        await fuelVaultBox.put(e.id, e);
+      }
+
+      await Hive.box<PlayerProfile>(_playerProfileBox).put(_playerProfileKey, profile);
+    } catch (e, st) {
+      _log('Restore failed mid-flight; attempting rollback', error: e, stackTrace: st);
+      await _rollback(
+        domains: oldDomains,
+        tasks: oldTasks,
+        dailyLogs: oldDailyLogs,
+        rivals: oldRivals,
+        fuelVault: oldFuelVault,
+        settings: oldSettings,
+        profile: oldProfile,
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> _rollback({
+    required List<dynamic> domains,
+    required List<dynamic> tasks,
+    required List<dynamic> dailyLogs,
+    required List<dynamic> rivals,
+    required List<dynamic> fuelVault,
+    required Map<String, dynamic> settings,
+    required Map<String, dynamic>? profile,
+  }) async {
+    try {
+      await Hive.box<Domain>(_domainsBox).clear();
+      await Hive.box<Task>(_tasksBox).clear();
+      await Hive.box<DailyLog>(_dailyLogsBox).clear();
+      await Hive.box<Rival>(_rivalsBox).clear();
+      await Hive.box<FuelVaultEntry>(_fuelVaultBox).clear();
+      await Hive.box<PlayerProfile>(_playerProfileBox).clear();
+      await Hive.box(_settingsBox).clear();
+
+      final settingsBox = Hive.box(_settingsBox);
+      for (final entry in settings.entries) {
+        final decoded = _decodeSettingValue(entry.value);
+        if (decoded == null) {
+          await settingsBox.delete(entry.key);
+        } else {
+          await settingsBox.put(entry.key, decoded);
+        }
+      }
+
+      final domainsBox = Hive.box<Domain>(_domainsBox);
+      for (final raw in domains) {
+        final d = Domain.fromJson(Map<String, dynamic>.from(raw as Map));
+        await domainsBox.put(d.id, d);
+      }
+
+      final tasksBox = Hive.box<Task>(_tasksBox);
+      for (final raw in tasks) {
+        final t = Task.fromJson(Map<String, dynamic>.from(raw as Map));
+        await tasksBox.put(t.id, t);
+      }
+
+      final dailyLogsBox = Hive.box<DailyLog>(_dailyLogsBox);
+      for (final raw in dailyLogs) {
+        final l = DailyLog.fromJson(Map<String, dynamic>.from(raw as Map));
+        final key = app_date_utils.DateUtils.getDateKey(l.date);
+        await dailyLogsBox.put(key, l);
+      }
+
+      final rivalsBox = Hive.box<Rival>(_rivalsBox);
+      for (final raw in rivals) {
+        final r = Rival.fromJson(Map<String, dynamic>.from(raw as Map));
+        await rivalsBox.put(r.id, r);
+      }
+
+      final fuelVaultBox = Hive.box<FuelVaultEntry>(_fuelVaultBox);
+      for (final raw in fuelVault) {
+        final e = FuelVaultEntry.fromJson(Map<String, dynamic>.from(raw as Map));
+        await fuelVaultBox.put(e.id, e);
+      }
+
+      if (profile != null) {
+        final p = PlayerProfile.fromJson(profile);
+        await Hive.box<PlayerProfile>(_playerProfileBox).put(_playerProfileKey, p);
+      }
+    } catch (e, st) {
+      _log('Rollback failed', error: e, stackTrace: st);
     }
   }
 
@@ -278,79 +582,78 @@ class BackupService {
       throw const FormatException('Root of backup must be a JSON object.');
     }
 
-    if (decoded['version'] is! int) {
-      throw const FormatException('"version" must be an integer.');
+    final migrated = _migrationService.normalizeAndMigrate(decoded);
+    _validateLatestEnvelope(migrated);
+    return migrated;
+  }
+
+  void _validateLatestEnvelope(Map<String, dynamic> envelope) {
+    final version = envelope['schemaVersion'];
+    if (version is! int) {
+      throw const FormatException('"schemaVersion" must be an integer.');
+    }
+    if (version != schemaVersion) {
+      // We only ever output the latest; treat mismatch as invalid.
+      throw FormatException('Unsupported schemaVersion: $version');
     }
 
-    // Normalize to the latest structure:
-    // {
-    //   version, appVersion?, timestamp, device?, data: { domains, tasks, ... }
-    // }
-    // Also supports the legacy v1 format where lists lived at root.
-    final Map<String, dynamic> normalized = Map<String, dynamic>.from(decoded);
-
-    if (normalized['data'] is! Map<String, dynamic>) {
-      normalized['data'] = <String, dynamic>{
-        'domains': normalized['domains'] ?? const [],
-        'tasks': normalized['tasks'] ?? const [],
-        'dailyLogs': normalized['dailyLogs'] ?? const [],
-        'rivals': normalized['rivals'] ?? const [],
-        'fuelVault': normalized['fuelVault'] ?? const [],
-      };
+    if (envelope['timestamp'] is! String) {
+      throw const FormatException('"timestamp" must be a string.');
     }
 
-    final data = normalized['data'];
-    if (data is! Map<String, dynamic>) {
+    if (envelope['data'] is! Map) {
       throw const FormatException('"data" must be a JSON object.');
     }
 
-    const requiredDataKeys = ['domains', 'tasks', 'dailyLogs', 'rivals', 'fuelVault'];
-    for (final key in requiredDataKeys) {
-      if (!data.containsKey(key)) {
-        throw FormatException('Missing required key: "data.$key".');
-      }
+    final data = Map<String, dynamic>.from(envelope['data'] as Map);
+    const listKeys = ['domains', 'tasks', 'dailyLogs', 'rivals', 'fuelVault'];
+    for (final key in listKeys) {
       if (data[key] is! List) {
         throw FormatException('"data.$key" must be a JSON array.');
       }
     }
 
-    if (normalized['timestamp'] == null || normalized['timestamp'] is! String) {
-      throw const FormatException('"timestamp" must be a string.');
+    if (data['playerProfile'] != null && data['playerProfile'] is! Map) {
+      throw const FormatException('"data.playerProfile" must be a JSON object.');
     }
-
-    // Optional metadata keys: appVersion, device.
-    normalized['appVersion'] ??= backupAppVersion;
-    normalized['device'] ??= 'unknown';
-
-    return normalized;
-  }
-
-  // ── Migration ──────────────────────────────────────────────────────────────
-
-  /// Applies incremental schema migrations from [fromVersion] to [schemaVersion].
-  ///
-  /// Add a new `case` block here whenever [schemaVersion] is incremented.
-  Map<String, dynamic> runMigration(
-    Map<String, dynamic> data,
-    int fromVersion,
-  ) {
-    var current = fromVersion;
-
-    while (current < schemaVersion) {
-      switch (current) {
-        // When migrating from v1 → v2, add the v2 transforms here.
-        // case 1:
-        //   data = _migrateV1toV2(data);
-        default:
-          // No migration defined for this step — skip.
-          break;
-      }
-      current++;
+    if (data['weeklyStats'] != null && data['weeklyStats'] is! Map) {
+      throw const FormatException('"data.weeklyStats" must be a JSON object.');
     }
-
-    data['version'] = schemaVersion;
-    return data;
   }
+}
+
+class BackupPreview {
+  final Map<String, dynamic> envelope;
+  final int schemaVersion;
+  final String timestampUtc;
+  final String device;
+  final String appVersion;
+
+  final int domainsCount;
+  final int tasksCount;
+  final int dailyLogsCount;
+  final int rivalsCount;
+  final int fuelVaultCount;
+
+  final int profileLevel;
+  final String profileRank;
+  final String profileName;
+
+  const BackupPreview({
+    required this.envelope,
+    required this.schemaVersion,
+    required this.timestampUtc,
+    required this.device,
+    required this.appVersion,
+    required this.domainsCount,
+    required this.tasksCount,
+    required this.dailyLogsCount,
+    required this.rivalsCount,
+    required this.fuelVaultCount,
+    required this.profileLevel,
+    required this.profileRank,
+    required this.profileName,
+  });
 }
 
 /// Thrown by [BackupService] when an unrecoverable error occurs during restore.

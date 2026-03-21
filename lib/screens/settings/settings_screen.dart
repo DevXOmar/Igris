@@ -45,37 +45,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _runRestore() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.backgroundElevated,
-        title: const Text(
-          'Restore Backup?',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        content: const Text(
-          'This will REPLACE all current data with the backup. '  
-          'This action cannot be undone.\n\nContinue?',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Restore', style: TextStyle(color: AppColors.neonBlue)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
     setState(() => _isRestoring = true);
     try {
-      await _backupService.restoreBackup();
+      final preview = await _backupService.pickBackupPreview();
+      if (!mounted) return;
+      if (preview == null) return;
+
+      final summary = StringBuffer()
+        ..writeln('Backup details')
+        ..writeln('• Timestamp (UTC): ${preview.timestampUtc}')
+        ..writeln('• Device: ${preview.device}')
+        ..writeln('• App version: ${preview.appVersion}')
+        ..writeln('')
+        ..writeln('Contains')
+        ..writeln('• Domains: ${preview.domainsCount}')
+        ..writeln('• Tasks: ${preview.tasksCount}')
+        ..writeln('• Daily logs: ${preview.dailyLogsCount}')
+        ..writeln('• Rivals: ${preview.rivalsCount}')
+        ..writeln('• Fuel Vault entries: ${preview.fuelVaultCount}')
+        ..writeln('')
+        ..writeln('Profile')
+        ..writeln('• Level: ${preview.profileLevel}')
+        ..writeln('• Rank: ${preview.profileRank}')
+        ..writeln('• Name: ${preview.profileName.isEmpty ? "(not set)" : preview.profileName}')
+        ..writeln('')
+        ..writeln('This will REPLACE all current data with the backup.')
+        ..writeln('This action cannot be undone.');
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.backgroundElevated,
+          title: const Text(
+            'Restore Backup?',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          content: Text(
+            summary.toString(),
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text(
+                'Restore',
+                style: TextStyle(color: AppColors.neonBlue),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      await _backupService.restoreFromEnvelope(preview.envelope);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
