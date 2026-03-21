@@ -29,6 +29,7 @@ class DemoSeedService {
     if (profile.totalXP != 0) return true;
     if (profile.rank != 'E') return true;
     if (profile.activeTitleIds.isNotEmpty) return true;
+    if (profile.equippedTitleIds.isNotEmpty) return true;
     if (profile.unlockedTitleIds.isNotEmpty) return true;
     if (profile.feats.isNotEmpty) return true;
     if (profile.totalTasksCompleted != 0) return true;
@@ -199,6 +200,7 @@ class DemoSeedService {
       totalXP: 25000,
       rank: 'S',
       activeTitleIds: allTitleIds.take(2).toList(growable: false),
+      equippedTitleIds: allTitleIds.take(2).toList(growable: false),
       unlockedTitleIds: allTitleIds,
       feats: [
         Feat(

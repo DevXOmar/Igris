@@ -4,7 +4,9 @@ import 'package:flutter/material.dart' show Icons, IconData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
 import '../models/feat.dart';
+import '../models/domain.dart';
 import '../models/player_profile.dart';
+import '../models/task.dart';
 import '../providers/domain_provider.dart';
 import '../providers/task_provider.dart';
 import '../providers/weekly_stats_provider.dart';
@@ -18,6 +20,151 @@ import '../services/animation_service.dart';
 // Unlock logic lives here (pure function of PlayerProfile).
 // ─────────────────────────────────────────────────────────────────────────────
 
+enum TitleEffectType {
+  /// Additive XP bonus applied to all XP awards.
+  xpBonus,
+
+  /// Additive XP bonus applied only to streak milestone XP awards.
+  streakXpBonus,
+
+  /// Additive bonus to stat points earned from XP milestones.
+  statPointBonus,
+
+  /// Additive bonus to an individual stat (effective display power).
+  statBonus,
+
+  /// Additive bonus to all stats (effective display power).
+  allStatsBonus,
+
+  /// Additive XP bonus applied to task completion XP (category-aware).
+  taskXpBonus,
+
+  /// Additive XP bonus applied only to weekly goal completion XP.
+  weeklyGoalXpBonus,
+
+  /// Informational effect (no numeric gameplay change in code).
+  note,
+}
+
+enum TaskXpCategory {
+  taskComplete,
+  study,
+  work,
+  fitness,
+  oneTime,
+  dominantDomain,
+}
+
+class TitleEffect {
+  final TitleEffectType type;
+  final double percent;
+  final String? statKey;
+  final TaskXpCategory? taskXpCategory;
+  final String? note;
+
+  const TitleEffect._(
+    this.type,
+    this.percent, {
+    this.statKey,
+    this.taskXpCategory,
+    this.note,
+  });
+
+  const TitleEffect.xpBonus(double percent)
+      : this._(TitleEffectType.xpBonus, percent);
+
+  const TitleEffect.streakXpBonus(double percent)
+      : this._(TitleEffectType.streakXpBonus, percent);
+
+  const TitleEffect.statPointBonus(double percent)
+      : this._(TitleEffectType.statPointBonus, percent);
+
+  const TitleEffect.statBonus({
+    required String statKey,
+    required double percent,
+  }) : this._(
+          TitleEffectType.statBonus,
+          percent,
+          statKey: statKey,
+        );
+
+  const TitleEffect.allStatsBonus(double percent)
+      : this._(TitleEffectType.allStatsBonus, percent);
+
+  const TitleEffect.taskXpBonus({
+    required TaskXpCategory category,
+    required double percent,
+  }) : this._(
+          TitleEffectType.taskXpBonus,
+          percent,
+          taskXpCategory: category,
+        );
+
+  const TitleEffect.weeklyGoalXpBonus(double percent)
+      : this._(TitleEffectType.weeklyGoalXpBonus, percent);
+
+  const TitleEffect.note(String text)
+      : this._(TitleEffectType.note, 0.0, note: text);
+
+  String format() {
+    String pct(double v) => '${(v * 100).round()}%';
+    if (type == TitleEffectType.xpBonus) {
+      return '+${pct(percent)} XP';
+    }
+    if (type == TitleEffectType.streakXpBonus) {
+      return '+${pct(percent)} streak XP';
+    }
+    if (type == TitleEffectType.statPointBonus) {
+      return '+${pct(percent)} stat growth';
+    }
+    if (type == TitleEffectType.allStatsBonus) {
+      return '+${pct(percent)} all stats';
+    }
+    if (type == TitleEffectType.statBonus) {
+      final label = (statKey ?? 'stat').toUpperCase();
+      return '+${pct(percent)} $label';
+    }
+    if (type == TitleEffectType.taskXpBonus) {
+      final c = taskXpCategory;
+      final label = switch (c) {
+        TaskXpCategory.taskComplete => 'task XP',
+        TaskXpCategory.study => 'study task XP',
+        TaskXpCategory.work => 'work task XP',
+        TaskXpCategory.fitness => 'fitness task XP',
+        TaskXpCategory.oneTime => 'one-time task XP',
+        TaskXpCategory.dominantDomain => 'dominant domain XP',
+        _ => 'task XP',
+      };
+      return '+${pct(percent)} $label';
+    }
+    if (type == TitleEffectType.weeklyGoalXpBonus) {
+      return '+${pct(percent)} weekly goal XP';
+    }
+    if (type == TitleEffectType.note) {
+      return note ?? '';
+    }
+    return '';
+  }
+}
+
+class AggregatedTitleEffects {
+  final double xpBonusPercent;
+  final double streakXpBonusPercent;
+  final double statPointBonusPercent;
+
+  const AggregatedTitleEffects({
+    required this.xpBonusPercent,
+    required this.streakXpBonusPercent,
+    required this.statPointBonusPercent,
+  });
+
+  static const none = AggregatedTitleEffects(
+    xpBonusPercent: 0.0,
+    streakXpBonusPercent: 0.0,
+    statPointBonusPercent: 0.0,
+  );
+}
+
 class TitleDefinition {
   final String id;
   final String name;
@@ -28,6 +175,9 @@ class TitleDefinition {
 
   final IconData icon;
 
+  /// Gameplay modifiers granted when the title is equipped.
+  final List<TitleEffect> effects;
+
   /// Returns true when [profile] satisfies the unlock requirement.
   final bool Function(TitleUnlockContext context) checkCondition;
 
@@ -37,6 +187,7 @@ class TitleDefinition {
     required this.description,
     required this.unlockCondition,
     required this.icon,
+    this.effects = const [],
     required this.checkCondition,
   });
 }
@@ -222,6 +373,9 @@ class TitleDefinitions {
       description: 'A new hunter steps into the gates.',
       unlockCondition: 'Complete 10 tasks',
       icon: Icons.emoji_events_outlined,
+      effects: const [
+        TitleEffect.xpBonus(0.05),
+      ],
       checkCondition: (c) => c.profile.totalTasksCompleted >= 10,
     ),
     TitleDefinition(
@@ -230,6 +384,9 @@ class TitleDefinitions {
       description: 'Your power has begun to surface.',
       unlockCondition: 'Reach Level 5',
       icon: Icons.auto_awesome,
+      effects: const [
+        TitleEffect.statPointBonus(0.05),
+      ],
       checkCondition: (c) => c.profile.level >= 5,
     ),
     TitleDefinition(
@@ -238,6 +395,9 @@ class TitleDefinitions {
       description: 'You kept moving, day after day.',
       unlockCondition: '7-day streak',
       icon: Icons.shield_outlined,
+      effects: const [
+        TitleEffect.streakXpBonus(0.10),
+      ],
       checkCondition: (c) => c.profile.longestStreak >= 7,
     ),
     TitleDefinition(
@@ -246,6 +406,9 @@ class TitleDefinitions {
       description: 'Consistency is your weapon.',
       unlockCondition: '30-day streak',
       icon: Icons.local_fire_department,
+      effects: const [
+        TitleEffect.streakXpBonus(0.15),
+      ],
       checkCondition: (c) => c.profile.longestStreak >= 30,
     ),
     TitleDefinition(
@@ -254,6 +417,12 @@ class TitleDefinitions {
       description: 'Controlled grace. Unbroken execution. Three weeks straight.',
       unlockCondition: 'Use at most 1 grace per week and maintain streak for 3 weeks',
       icon: Icons.multiline_chart,
+      effects: const [
+        TitleEffect.statBonus(statKey: 'discipline', percent: 0.20),
+        TitleEffect.streakXpBonus(0.10),
+        TitleEffect.xpBonus(0.05),
+        TitleEffect.note('Grace preserves your streak but grants no XP for that day.'),
+      ],
       checkCondition: (c) => c.hasUnyieldingRythmForThreeWeeks,
     ),
     TitleDefinition(
@@ -262,6 +431,9 @@ class TitleDefinitions {
       description: 'A mind that refuses to fracture.',
       unlockCondition: '50 tasks without breaking streak',
       icon: Icons.military_tech_outlined,
+      effects: const [
+        TitleEffect.statBonus(statKey: 'discipline', percent: 0.10),
+      ],
       checkCondition: (c) => c.completedTaskInstancesInCurrentStreak >= 50,
     ),
     TitleDefinition(
@@ -270,6 +442,10 @@ class TitleDefinitions {
       description: 'Swift, precise, relentless in execution.',
       unlockCondition: '100 total tasks',
       icon: Icons.flash_on,
+      effects: const [
+        TitleEffect.taskXpBonus(category: TaskXpCategory.taskComplete, percent: 0.15),
+        TitleEffect.xpBonus(0.05),
+      ],
       checkCondition: (c) => c.profile.totalTasksCompleted >= 100,
     ),
     TitleDefinition(
@@ -278,6 +454,11 @@ class TitleDefinitions {
       description: 'Builds mastery across multiple domains.',
       unlockCondition: 'Reach Level 10',
       icon: Icons.account_tree,
+      effects: const [
+        // Strategy maps to Intelligence in this build.
+        TitleEffect.statBonus(statKey: 'intelligence', percent: 0.10),
+        TitleEffect.statBonus(statKey: 'intelligence', percent: 0.05),
+      ],
       checkCondition: (c) => c.profile.level >= 10,
     ),
     TitleDefinition(
@@ -286,6 +467,10 @@ class TitleDefinitions {
       description: 'Knowledge through persistent discipline.',
       unlockCondition: '200 study-related tasks',
       icon: Icons.menu_book,
+      effects: const [
+        TitleEffect.statBonus(statKey: 'intelligence', percent: 0.15),
+        TitleEffect.taskXpBonus(category: TaskXpCategory.study, percent: 0.10),
+      ],
       checkCondition: (c) =>
           c.sumDomainStrengthWhere((n) => _studyRe.hasMatch(n)) >= 200,
     ),
@@ -295,6 +480,11 @@ class TitleDefinitions {
       description: 'Turns effort into output, again and again.',
       unlockCondition: '150 work/productivity tasks',
       icon: Icons.build_outlined,
+      effects: const [
+        // Execution maps to Discipline in this build.
+        TitleEffect.statBonus(statKey: 'discipline', percent: 0.15),
+        TitleEffect.taskXpBonus(category: TaskXpCategory.work, percent: 0.10),
+      ],
       checkCondition: (c) =>
           c.sumDomainStrengthWhere((n) => _workRe.hasMatch(n)) >= 150,
     ),
@@ -304,6 +494,11 @@ class TitleDefinitions {
       description: 'A body forged in repetition.',
       unlockCondition: '100 fitness tasks',
       icon: Icons.fitness_center,
+      effects: const [
+        // Vitality maps to Endurance in this build.
+        TitleEffect.statBonus(statKey: 'endurance', percent: 0.15),
+        TitleEffect.taskXpBonus(category: TaskXpCategory.fitness, percent: 0.10),
+      ],
       checkCondition: (c) =>
           c.sumDomainStrengthWhere((n) => _fitnessRe.hasMatch(n)) >= 100,
     ),
@@ -313,6 +508,9 @@ class TitleDefinitions {
       description: 'Moves through every domain without faltering.',
       unlockCondition: 'Consistent activity across ALL domains',
       icon: Icons.blur_on,
+      effects: const [
+        TitleEffect.allStatsBonus(0.05),
+      ],
       checkCondition: (c) => c.hasActivityAcrossAllActiveDomainsThisWeek,
     ),
     TitleDefinition(
@@ -321,6 +519,9 @@ class TitleDefinitions {
       description: 'One domain stands fully conquered.',
       unlockCondition: 'Max out one domain',
       icon: Icons.flag_outlined,
+      effects: const [
+        TitleEffect.taskXpBonus(category: TaskXpCategory.dominantDomain, percent: 0.20),
+      ],
       checkCondition: (c) => c.anyDomainStrengthAtLeast(_domainConquerorStrengthThreshold),
     ),
     TitleDefinition(
@@ -329,6 +530,10 @@ class TitleDefinitions {
       description: 'Your presence alone shifts the room.',
       unlockCondition: 'Level 30',
       icon: Icons.stars_rounded,
+      effects: const [
+        TitleEffect.xpBonus(0.10),
+        TitleEffect.statBonus(statKey: 'presence', percent: 0.10),
+      ],
       checkCondition: (c) => c.profile.level >= 30,
     ),
     TitleDefinition(
@@ -337,6 +542,9 @@ class TitleDefinitions {
       description: 'You endured the week’s crushing weight.',
       unlockCondition: '50 tasks in one week',
       icon: Icons.calendar_month_outlined,
+      effects: const [
+        TitleEffect.weeklyGoalXpBonus(0.25),
+      ],
       checkCondition: (c) => c.weeklyStats.completedTasksThisWeek >= 50,
     ),
     TitleDefinition(
@@ -345,6 +553,11 @@ class TitleDefinitions {
       description: 'Loyalty sharpened into an edge.',
       unlockCondition: '100-day streak',
       icon: Icons.gavel,
+      effects: const [
+        TitleEffect.statBonus(statKey: 'discipline', percent: 0.20),
+        // Execution maps to Discipline in this build.
+        TitleEffect.statBonus(statKey: 'discipline', percent: 0.10),
+      ],
       checkCondition: (c) => c.profile.longestStreak >= 100,
     ),
     TitleDefinition(
@@ -353,6 +566,9 @@ class TitleDefinitions {
       description: 'Balance maintained. Order enforced.',
       unlockCondition: 'Maintain balanced weekly progress across domains',
       icon: Icons.balance,
+      effects: const [
+        TitleEffect.note('+10% all stats if weekly balance is met.'),
+      ],
       checkCondition: (c) => c.hasBalancedWeeklyProgressAcrossDomains,
     ),
     TitleDefinition(
@@ -361,6 +577,9 @@ class TitleDefinitions {
       description: 'A legion formed from relentless completion.',
       unlockCondition: '1000 total tasks',
       icon: Icons.groups_2_outlined,
+      effects: const [
+        TitleEffect.xpBonus(0.15),
+      ],
       checkCondition: (c) => c.profile.totalTasksCompleted >= 1000,
     ),
     TitleDefinition(
@@ -369,6 +588,10 @@ class TitleDefinitions {
       description: 'A name known far beyond the gates.',
       unlockCondition: 'Level 100 OR major real-world milestone',
       icon: Icons.public,
+      effects: const [
+        TitleEffect.statBonus(statKey: 'presence', percent: 0.20),
+        TitleEffect.xpBonus(0.10),
+      ],
       checkCondition: (c) => c.profile.level >= 100 || c.profile.feats.isNotEmpty,
     ),
     TitleDefinition(
@@ -377,6 +600,9 @@ class TitleDefinitions {
       description: 'You cleared what others abandoned.',
       unlockCondition: 'Clear 100+ backlog/overdue tasks',
       icon: Icons.task_alt,
+      effects: const [
+        TitleEffect.taskXpBonus(category: TaskXpCategory.oneTime, percent: 0.20),
+      ],
       checkCondition: (c) => c.distinctOneTimeTasksCompleted >= 100,
     ),
     TitleDefinition(
@@ -385,6 +611,11 @@ class TitleDefinitions {
       description: 'A year of discipline — and beyond.',
       unlockCondition: '365-day streak + extreme consistency',
       icon: Icons.workspace_premium,
+      effects: const [
+        TitleEffect.allStatsBonus(0.15),
+        TitleEffect.xpBonus(0.15),
+        TitleEffect.streakXpBonus(0.10),
+      ],
       checkCondition: (c) =>
           c.profile.longestStreak >= 365 && c.profile.weeklyGoalsCompleted >= 12,
     ),
@@ -459,25 +690,155 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   static const int _xpPerStatPoint = 250;
   static const int _maxStatValue = PlayerProfile.defaultMaxStatValue;
 
+  static const double _maxAdditiveXpBonus = 0.50;
+
   final ProgressionService _service = ProgressionService();
+  final DailyLogService _dailyLogService = DailyLogService();
 
   @override
   PlayerProfile build() {
     final profile = _service.getProfile();
     final knownIds = TitleDefinitions.all.map((t) => t.id).toSet();
-    final sanitizedActive =
+    final legacyActive =
         profile.activeTitleIds.where(knownIds.contains).toList(growable: false);
+    final equippedSource = profile.equippedTitleIds.isNotEmpty
+        ? profile.equippedTitleIds
+        : legacyActive;
+    final sanitizedEquipped = _sanitizeEquippedTitleIds(
+      equippedSource,
+      knownIds: knownIds,
+    );
     final sanitizedUnlocked =
         profile.unlockedTitleIds.where(knownIds.contains).toList(growable: false);
 
-    if (sanitizedActive.length == profile.activeTitleIds.length &&
+    if (sanitizedEquipped.length == profile.equippedTitleIds.length &&
+        sanitizedEquipped.length == profile.activeTitleIds.length &&
         sanitizedUnlocked.length == profile.unlockedTitleIds.length) {
       return profile;
     }
     return profile.copyWith(
-      activeTitleIds: sanitizedActive,
+      equippedTitleIds: sanitizedEquipped,
+      activeTitleIds: sanitizedEquipped,
       unlockedTitleIds: sanitizedUnlocked,
     );
+  }
+
+  List<String> _sanitizeEquippedTitleIds(
+    List<String> ids, {
+    required Set<String> knownIds,
+  }) {
+    if (ids.isEmpty) return const [];
+    final seen = <String>{};
+    final out = <String>[];
+    for (final id in ids) {
+      if (!knownIds.contains(id)) continue;
+      if (seen.contains(id)) continue;
+      seen.add(id);
+      out.add(id);
+      if (out.length >= 2) break;
+    }
+    return out.toList(growable: false);
+  }
+
+  AggregatedTitleEffects _aggregateEquippedTitleEffects(PlayerProfile profile) {
+    final ids = profile.equippedTitleIds;
+    if (ids.isEmpty) return AggregatedTitleEffects.none;
+
+    double xp = 0.0;
+    double streakXp = 0.0;
+    double statPoints = 0.0;
+
+    for (final id in ids) {
+      final def = TitleDefinitions.findById(id);
+      if (def == null) continue;
+      for (final e in def.effects) {
+        if (e.type == TitleEffectType.xpBonus) xp += e.percent;
+        if (e.type == TitleEffectType.streakXpBonus) streakXp += e.percent;
+        if (e.type == TitleEffectType.statPointBonus) statPoints += e.percent;
+      }
+    }
+
+    double cap(double v) => v.clamp(0.0, _maxAdditiveXpBonus);
+
+    return AggregatedTitleEffects(
+      xpBonusPercent: cap(xp),
+      streakXpBonusPercent: cap(streakXp),
+      statPointBonusPercent: cap(statPoints),
+    );
+  }
+
+  int _applyXpEffects({
+    required int base,
+    required bool isStreak,
+  }) {
+    if (base <= 0) return base;
+    final effects = _aggregateEquippedTitleEffects(state);
+    final bonus = effects.xpBonusPercent + (isStreak ? effects.streakXpBonusPercent : 0.0);
+    final awarded = (base * (1.0 + bonus)).round();
+    return awarded <= 0 ? 1 : awarded;
+  }
+
+  double _weeklyGoalBonusPercent(PlayerProfile profile) {
+    double bonus = 0.0;
+    for (final id in profile.equippedTitleIds) {
+      final def = TitleDefinitions.findById(id);
+      if (def == null) continue;
+      for (final e in def.effects) {
+        if (e.type == TitleEffectType.weeklyGoalXpBonus) bonus += e.percent;
+      }
+    }
+    return max(0.0, bonus);
+  }
+
+  int _applyWeeklyGoalXpEffects(int base) {
+    if (base <= 0) return base;
+    final bonus = _weeklyGoalBonusPercent(state);
+    return (base * (1.0 + bonus)).round();
+  }
+
+  bool _isDominantDomain(String domainId) {
+    final domains = ref.read(domainProvider).domains;
+    final active = domains.where((d) => d.isActive).toList(growable: false);
+    if (active.isEmpty) return false;
+    final maxStrength = active.map((d) => d.strength).reduce(max);
+    if (maxStrength <= 0) return false;
+    return active.any((d) => d.id == domainId && d.strength == maxStrength);
+  }
+
+  ({bool isStudy, bool isWork, bool isFitness}) _domainTagsFor(String domainName) {
+    final n = domainName.trim().toLowerCase();
+    return (
+      isStudy: TitleDefinitions._studyRe.hasMatch(n),
+      isWork: TitleDefinitions._workRe.hasMatch(n),
+      isFitness: TitleDefinitions._fitnessRe.hasMatch(n),
+    );
+  }
+
+  double _taskBonusPercent({
+    required PlayerProfile profile,
+    required Task task,
+    required Domain? domain,
+  }) {
+    double bonus = 0.0;
+    final isOneTime = task.isRecurring == false;
+    final isDominant = domain != null && _isDominantDomain(domain.id);
+    final tags = domain != null ? _domainTagsFor(domain.name) : (isStudy: false, isWork: false, isFitness: false);
+
+    for (final id in profile.equippedTitleIds) {
+      final def = TitleDefinitions.findById(id);
+      if (def == null) continue;
+      for (final e in def.effects) {
+        if (e.type != TitleEffectType.taskXpBonus) continue;
+        final c = e.taskXpCategory;
+        if (c == TaskXpCategory.taskComplete) bonus += e.percent;
+        if (c == TaskXpCategory.oneTime && isOneTime) bonus += e.percent;
+        if (c == TaskXpCategory.dominantDomain && isDominant) bonus += e.percent;
+        if (c == TaskXpCategory.study && tags.isStudy) bonus += e.percent;
+        if (c == TaskXpCategory.work && tags.isWork) bonus += e.percent;
+        if (c == TaskXpCategory.fitness && tags.isFitness) bonus += e.percent;
+      }
+    }
+    return max(0.0, bonus);
   }
 
   // ── Formula: requiredXP = baseXP * level^1.5 ────────────────────────────
@@ -488,17 +849,35 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
 
   // ── Public action hooks ──────────────────────────────────────────────────
 
-  /// Atomically increments the task counter and awards 10 XP.
+  /// Atomically increments the task counter and awards XP.
   ///
   /// Safe to call from any Notifier (no external provider dependencies).
   /// Rank/title checks run automatically inside [addXP].
-  Future<void> recordTaskCompleted() async {
+  Future<void> recordTaskCompleted({
+    required String taskId,
+    required String domainId,
+  }) async {
     var profile = state.copyWith(
       totalTasksCompleted: state.totalTasksCompleted + 1,
     );
     await _service.saveProfile(profile);
     state = profile;
-    await addXP(XpRewards.taskComplete);
+
+    final taskState = ref.read(taskProvider);
+    Task? task;
+    try {
+      task = taskState.tasks.firstWhere((t) => t.id == taskId);
+    } catch (_) {
+      task = null;
+    }
+    final domain = ref.read(domainProvider).getDomainById(domainId);
+
+    final base = XpRewards.taskComplete;
+    final bonus = task == null
+        ? 0.0
+        : _taskBonusPercent(profile: state, task: task, domain: domain);
+    final adjustedBase = (base * (1.0 + bonus)).round();
+    await addXP(adjustedBase);
   }
 
   /// Syncs the current streak into [PlayerProfile.longestStreak] and
@@ -528,12 +907,20 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
         profile.copyWith(weeklyGoalsCompleted: profile.weeklyGoalsCompleted + 1);
     await _service.saveProfile(profile);
     state = profile;
-    await addXP(XpRewards.weeklyGoal);
+    await addXP(_applyWeeklyGoalXpEffects(XpRewards.weeklyGoal));
   }
 
-  /// Adds [amount] XP, then runs the full check pipeline:
+  /// Adds [baseAmount] XP (after applying equipped title effects),
+  /// then runs the full check pipeline:
   /// level-up → rank promotion → title unlocks.
-  Future<void> addXP(int amount) async {
+  Future<void> addXP(int baseAmount, {bool isStreakAward = false}) async {
+    // If grace is used today, the day is treated as "skipped" for rewards.
+    // Streak is preserved via graceUsed, but XP is blocked.
+    final today = app_date_utils.DateUtils.today;
+    final todayLog = _dailyLogService.getLogForDate(today);
+    if (todayLog?.graceUsed == true) return;
+
+    final amount = _applyXpEffects(base: baseAmount, isStreak: isStreakAward);
     var profile = state;
     profile = profile.copyWith(
       currentXP: profile.currentXP + amount,
@@ -622,17 +1009,24 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   /// Equip a title for display (must be unlocked first).
   Future<void> equipTitle(String id) async {
     if (!state.unlockedTitleIds.contains(id)) return;
-    if (state.activeTitleIds.contains(id)) return;
-    final profile =
-        state.copyWith(activeTitleIds: [...state.activeTitleIds, id]);
+    if (state.equippedTitleIds.contains(id)) return;
+    if (state.equippedTitleIds.length >= 2) return;
+    final equipped = [...state.equippedTitleIds, id];
+    final profile = state.copyWith(
+      equippedTitleIds: equipped,
+      activeTitleIds: equipped,
+    );
     await _service.saveProfile(profile);
     state = profile;
   }
 
   /// Remove a title from active display.
   Future<void> unequipTitle(String id) async {
+    final equipped =
+        state.equippedTitleIds.where((t) => t != id).toList(growable: false);
     final profile = state.copyWith(
-      activeTitleIds: state.activeTitleIds.where((t) => t != id).toList(),
+      equippedTitleIds: equipped,
+      activeTitleIds: equipped,
     );
     await _service.saveProfile(profile);
     state = profile;
@@ -662,7 +1056,7 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
         await _service.saveProfile(updated);
         state = updated;
 
-        await addXP(xp);
+        await addXP(xp, isStreakAward: true);
 
         // Fire streak animation
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -729,12 +1123,96 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     final earned = profile.totalXP ~/ _xpPerStatPoint;
     final delta = earned - profile.statPointsAwarded;
     if (delta <= 0) return profile;
+
+    final effects = _aggregateEquippedTitleEffects(profile);
+    final adjustedDelta =
+        max(delta, (delta * (1.0 + effects.statPointBonusPercent)).floor());
     return profile.copyWith(
       statPointsAwarded: earned,
-      unspentStatPoints: profile.unspentStatPoints + delta,
+      unspentStatPoints: profile.unspentStatPoints + adjustedDelta,
     );
   }
 }
+
+final equippedTitleEffectsProvider = Provider<AggregatedTitleEffects>((ref) {
+  final profile = ref.watch(progressionProvider);
+  return ref
+      .read(progressionProvider.notifier)
+      ._aggregateEquippedTitleEffects(profile);
+});
+
+bool _isWeeklyBalanceMet({
+  required WeeklyStats weeklyStats,
+  required DomainState domainState,
+}) {
+  final active = domainState.activeDomains;
+  if (active.length < 2) return false;
+  final values = <double>[];
+  for (final domain in active) {
+    final p = weeklyStats.weeklyProgress[domain] ?? 0.0;
+    if (p <= 0.0) return false;
+    values.add(p);
+  }
+  if (values.length < 2) return false;
+  final minP = values.reduce(min);
+  final maxP = values.reduce(max);
+  return minP >= 0.40 && (maxP - minP) <= 0.25;
+}
+
+final effectiveStatsProvider = Provider<Map<String, int>>((ref) {
+  final profile = ref.watch(progressionProvider);
+  final weeklyStats = ref.watch(weeklyStatsProvider);
+  final domains = ref.watch(domainProvider);
+
+  final base = <String, int>{
+    ...PlayerProfile.defaultStats,
+    ...profile.stats,
+  };
+
+  final bonusByKey = <String, double>{
+    for (final k in PlayerProfile.defaultStats.keys) k: 0.0,
+  };
+
+  final weeklyBalanced = _isWeeklyBalanceMet(
+    weeklyStats: weeklyStats,
+    domainState: domains,
+  );
+
+  for (final id in profile.equippedTitleIds) {
+    // Ruler’s Authority is conditional, so handle explicitly.
+    if (id == 'rulers_authority' && weeklyBalanced) {
+      for (final k in bonusByKey.keys) {
+        bonusByKey[k] = (bonusByKey[k] ?? 0.0) + 0.10;
+      }
+      continue;
+    }
+
+    final def = TitleDefinitions.findById(id);
+    if (def == null) continue;
+    for (final e in def.effects) {
+      if (e.type == TitleEffectType.allStatsBonus) {
+        for (final k in bonusByKey.keys) {
+          bonusByKey[k] = (bonusByKey[k] ?? 0.0) + e.percent;
+        }
+      }
+      if (e.type == TitleEffectType.statBonus && e.statKey != null) {
+        final key = e.statKey!;
+        if (bonusByKey.containsKey(key)) {
+          bonusByKey[key] = (bonusByKey[key] ?? 0.0) + e.percent;
+        }
+      }
+    }
+  }
+
+  const maxStat = PlayerProfile.defaultMaxStatValue;
+  final out = <String, int>{};
+  base.forEach((k, v) {
+    final bonus = bonusByKey[k] ?? 0.0;
+    final effective = (v * (1.0 + max(0.0, bonus))).round();
+    out[k] = effective.clamp(0, maxStat);
+  });
+  return out;
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROVIDER

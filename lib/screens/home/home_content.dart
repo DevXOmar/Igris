@@ -8,11 +8,11 @@ import 'package:percent_indicator/percent_indicator.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
 import '../../core/utils/date_utils.dart' as app_date_utils;
-import '../../models/player_profile.dart';
 import '../../models/task.dart';
 import '../../providers/grace_provider.dart';
 import '../../providers/daily_log_provider.dart';
 import '../../providers/progression_provider.dart';
+import '../../providers/domain_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/weekly_stats_provider.dart';
 import '../fuel_vault/vault_auth_screen.dart';
@@ -36,6 +36,9 @@ class HomeContent extends ConsumerWidget {
     final today = app_date_utils.DateUtils.today;
     final todayFormatted = app_date_utils.DateUtils.formatDateLong(today);
 
+    final now = DateTime.now();
+    final after9pm = now.hour >= 21;
+
     final startOfWeek = app_date_utils.DateUtils.getStartOfWeek(today);
     final endOfWeek = app_date_utils.DateUtils.getEndOfWeek(today);
     final weekRange =
@@ -43,6 +46,36 @@ class HomeContent extends ConsumerWidget {
 
     final weeklyStats = ref.watch(weeklyStatsProvider);
     final profile = ref.watch(progressionProvider);
+    final effectiveStats = ref.watch(effectiveStatsProvider);
+
+    final graceState = ref.watch(graceProvider);
+    final logState = ref.watch(dailyLogProvider);
+    final domainState = ref.watch(domainProvider);
+    final taskState = ref.watch(taskProvider);
+
+    final todayLog = logState.todayLog;
+    final graceAlreadyUsedToday = todayLog?.graceUsed ?? false;
+
+    final activeTodayTasks = taskState.tasks.where((task) {
+      final domain = domainState.getDomainById(task.domainId);
+      return domain != null && domain.isActive;
+    }).toList(growable: false);
+
+    final completedActiveTasks = (todayLog == null)
+      ? 0
+      : activeTodayTasks.where((task) => todayLog.isTaskCompleted(task.id)).length;
+
+    final completionRatio = activeTodayTasks.isEmpty
+      ? 1.0
+      : (completedActiveTasks / activeTodayTasks.length);
+
+    final lowProgressDetected =
+      activeTodayTasks.isNotEmpty && completionRatio < 0.70;
+
+    final canOfferGracePrompt = after9pm &&
+      lowProgressDetected &&
+      !graceAlreadyUsedToday &&
+      graceState.weeklyGraceLeft > 0;
 
     final domainProgressItems = weeklyStats.weeklyProgress.entries
         .map(
@@ -81,11 +114,79 @@ class HomeContent extends ConsumerWidget {
               child: Padding(
                 padding: DesignSystem.paddingH16,
                 child: WeeklyGraceCard(
-                  remaining: ref.watch(graceProvider).weeklyGraceLeft,
-                  max: ref.watch(graceProvider).maxGraceTokens,
+                  remaining: graceState.weeklyGraceLeft,
+                  max: graceState.maxGraceTokens,
                 ),
               ),
             ),
+            if (canOfferGracePrompt)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    DesignSystem.spacing16,
+                    DesignSystem.spacing12,
+                    DesignSystem.spacing16,
+                    0,
+                  ),
+                  child: _EndOfDayGracePromptCard(
+                    completionPercent: (completionRatio * 100).clamp(0, 100).toDouble(),
+                    onApply: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          backgroundColor: AppColors.backgroundSurface,
+                          title: Text(
+                            'SYSTEM WARNING',
+                            style: TextStyle(
+                              color: AppColors.bloodRed,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          content: Text(
+                            'Low progress detected.\n\nGrace Token will preserve your streak, but you will gain no XP.',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              height: 1.35,
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(color: AppColors.textSecondary),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(true),
+                              child: Text(
+                                'Apply Grace',
+                                style: TextStyle(
+                                  color: AppColors.royalGold,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed != true) return;
+
+                      final ok = await ref
+                          .read(dailyLogProvider.notifier)
+                          .useGraceForToday();
+                      if (!ok && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Weekly grace limit reached (2/2).'),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(
@@ -111,12 +212,12 @@ class HomeContent extends ConsumerWidget {
                   DesignSystem.spacing12,
                 ),
                 child: HunterStatsCard(
-                  presence: (profile.stats['presence'] ?? 0),
-                  strength: (profile.stats['strength'] ?? 0),
-                  agility: (profile.stats['agility'] ?? 0),
-                  endurance: (profile.stats['endurance'] ?? 0),
-                  intelligence: (profile.stats['intelligence'] ?? 0),
-                  discipline: (profile.stats['discipline'] ?? 0),
+                  presence: (effectiveStats['presence'] ?? 0),
+                  strength: (effectiveStats['strength'] ?? 0),
+                  agility: (effectiveStats['agility'] ?? 0),
+                  endurance: (effectiveStats['endurance'] ?? 0),
+                  intelligence: (effectiveStats['intelligence'] ?? 0),
+                  discipline: (effectiveStats['discipline'] ?? 0),
                   onAllocate: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const StatsAllocationScreen(),
@@ -161,11 +262,6 @@ class HomeContent extends ConsumerWidget {
     );
   }
 
-  int _deriveExecution(PlayerProfile profile) {
-    // Deterministic derived metric; keeps UI stable without changing data model.
-    // 1 + (tasks completed / 10), clamped to 1..99.
-    return (1 + (profile.totalTasksCompleted ~/ 10)).clamp(1, 99);
-  }
 }
 
 class _WeeklyProgressItem {
@@ -360,6 +456,84 @@ class WeeklyGraceCard extends StatelessWidget {
                 color: AppColors.royalGold,
                 fontWeight: FontWeight.w900,
                 fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EndOfDayGracePromptCard extends StatelessWidget {
+  final double completionPercent;
+  final VoidCallback onApply;
+
+  const _EndOfDayGracePromptCard({
+    required this.completionPercent,
+    required this.onApply,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _GradientFrame(
+      border: LinearGradient(
+        colors: [
+          AppColors.bloodRed.withValues(alpha: 0.55),
+          AppColors.royalGold.withValues(alpha: 0.24),
+          AppColors.neonBlue.withValues(alpha: 0.10),
+        ],
+      ),
+      glow: AppColors.bloodRed.withValues(alpha: 0.18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: DesignSystem.spacing16,
+          vertical: DesignSystem.spacing12,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: AppColors.royalGold,
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Low progress detected',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Today: ${completionPercent.toStringAsFixed(0)}% complete. Apply Grace to preserve streak (no XP).',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            TextButton(
+              onPressed: onApply,
+              child: Text(
+                'Apply Grace',
+                style: TextStyle(
+                  color: AppColors.royalGold,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],

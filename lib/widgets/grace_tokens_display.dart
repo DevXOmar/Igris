@@ -19,7 +19,7 @@ class GraceTokensDisplay extends ConsumerWidget {
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: colorScheme.royalGold.withOpacity(0.3),
+          color: colorScheme.royalGold.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -49,11 +49,11 @@ class GraceTokensDisplay extends ConsumerWidget {
                       shape: BoxShape.circle,
                       color: index < graceState.weeklyGraceLeft
                           ? colorScheme.royalGold
-                          : colorScheme.royalGold.withOpacity(0.15),
+                          : colorScheme.royalGold.withValues(alpha: 0.15),
                       boxShadow: index < graceState.weeklyGraceLeft
                           ? [
                               BoxShadow(
-                                color: colorScheme.royalGold.withOpacity(0.4),
+                                color: colorScheme.royalGold.withValues(alpha: 0.4),
                                 blurRadius: 6,
                                 spreadRadius: 1,
                               ),
@@ -65,8 +65,8 @@ class GraceTokensDisplay extends ConsumerWidget {
                         Icons.shield,
                         size: 14,
                         color: index < graceState.weeklyGraceLeft
-                            ? Colors.black.withOpacity(0.8)
-                            : colorScheme.royalGold.withOpacity(0.4),
+                            ? Colors.black.withValues(alpha: 0.8)
+                            : colorScheme.royalGold.withValues(alpha: 0.4),
                       ),
                     ),
                   ),

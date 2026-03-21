@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/daily_log.dart';
 import '../services/daily_log_service.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
+import 'grace_provider.dart';
 import 'domain_provider.dart';
 import 'progression_provider.dart';
 
@@ -70,6 +71,7 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
   Future<void> toggleTaskCompletion(String taskId, String domainId) async {
     final today = state.today;
     final wasCompleted = state.isTaskCompletedToday(taskId);
+    final graceUsed = state.todayLog?.graceUsed ?? false;
     
     // Toggle completion in daily log
     await _service.toggleTaskCompletion(today, taskId);
@@ -81,8 +83,12 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
     } else {
       // Task was not completed, now completing -> increase strength
       await ref.read(domainProvider.notifier).incrementDomainStrength(domainId);
-      // Award XP for task completion
-      await ref.read(progressionProvider.notifier).recordTaskCompleted();
+      if (!graceUsed) {
+        // Award XP for task completion
+        await ref
+            .read(progressionProvider.notifier)
+            .recordTaskCompleted(taskId: taskId, domainId: domainId);
+      }
     }
     
     // Reload today's log
@@ -94,7 +100,12 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
     if (!state.isTaskCompletedToday(taskId)) {
       await _service.completeTask(state.today, taskId);
       await ref.read(domainProvider.notifier).incrementDomainStrength(domainId);
-      await ref.read(progressionProvider.notifier).recordTaskCompleted();
+      final graceUsed = state.todayLog?.graceUsed ?? false;
+      if (!graceUsed) {
+        await ref
+            .read(progressionProvider.notifier)
+            .recordTaskCompleted(taskId: taskId, domainId: domainId);
+      }
       loadTodayLog();
     }
   }
@@ -115,9 +126,10 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
   
   /// Use grace for today
   /// Grace prevents streak breaks (stored as graceUsed = true in log)
-  Future<void> useGraceForToday() async {
-    await _service.useGrace(state.today);
+  Future<bool> useGraceForToday() async {
+    final ok = await ref.read(graceProvider.notifier).applyGraceForDate(state.today);
     loadTodayLog();
+    return ok;
   }
   
   /// Get count of grace tokens used this week

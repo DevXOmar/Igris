@@ -35,7 +35,7 @@ class _HunterTitlesSectionState extends ConsumerState<HunterTitlesSection> {
 
     final all = TitleDefinitions.all;
     final unlockedIds = profile.unlockedTitleIds.toSet();
-    final activeIds = profile.activeTitleIds.toSet();
+    final activeIds = profile.equippedTitleIds.toSet();
 
     final unlockedTitles = <TitleDefinition>[];
     final lockedTitles = <TitleDefinition>[];
@@ -133,6 +133,15 @@ class _HunterTitlesSectionState extends ConsumerState<HunterTitlesSection> {
                               if (isEquipped) {
                                 notifier.unequipTitle(def.id);
                               } else {
+                                if (ref.read(progressionProvider).equippedTitleIds.length >= 2) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('You can equip up to 2 titles.'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                  return;
+                                }
                                 notifier.equipTitle(def.id);
                               }
                             }
@@ -157,7 +166,7 @@ class _HunterTitlesSectionState extends ConsumerState<HunterTitlesSection> {
     required WeeklyStats weeklyStats,
   }) async {
     final unlockedIds = profile.unlockedTitleIds.toSet();
-    final activeIds = profile.activeTitleIds.toSet();
+    final activeIds = profile.equippedTitleIds.toSet();
     final all = TitleDefinitions.all;
 
     await IgrisBottomSheet.show<void>(
@@ -173,7 +182,7 @@ class _HunterTitlesSectionState extends ConsumerState<HunterTitlesSection> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Tap an unlocked title to equip it.',
+                  'Tap an unlocked title to equip it (max 2).',
                   style: TextStyle(
                     color: AppColors.textMuted.withValues(alpha: 0.9),
                     fontSize: 12,
@@ -216,6 +225,15 @@ class _HunterTitlesSectionState extends ConsumerState<HunterTitlesSection> {
                                     if (isEquipped) {
                                       notifier.unequipTitle(def.id);
                                     } else {
+                                      if (ref.read(progressionProvider).equippedTitleIds.length >= 2) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('You can equip up to 2 titles.'),
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                        return;
+                                      }
                                       notifier.equipTitle(def.id);
                                     }
                                   }
@@ -572,6 +590,26 @@ class _HunterTitleCardState extends State<_HunterTitleCard> {
                 ),
               ),
               const Spacer(),
+
+              if (widget.definition.effects.isNotEmpty) ...[
+                Text(
+                  widget.definition.effects
+                      .take(2)
+                      .map((e) => e.format())
+                      .join(' • '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.neonBlue.withValues(
+                      alpha: widget.isUnlocked ? 0.92 : 0.60,
+                    ),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
 
               Text(
                 widget.definition.unlockCondition,

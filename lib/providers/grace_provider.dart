@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
+import '../services/daily_log_service.dart';
 import '../services/settings_service.dart';
 
 /// State class for Grace token management
@@ -44,15 +45,20 @@ class GraceState {
 /// Settings Service (Hive) <-> Grace Notifier <-> UI
 class GraceNotifier extends Notifier<GraceState> {
   final SettingsService _service = SettingsService();
+  final DailyLogService _dailyLogService = DailyLogService();
   
   @override
   GraceState build() {
     // Initialize on first build
     _initializeAndCheckReset();
+
+    final maxTokens = _service.getMaxGraceTokens();
+    final usedThisWeek = _dailyLogService.getGraceUsedThisWeek();
+    final weeklyLeft = (maxTokens - usedThisWeek).clamp(0, maxTokens);
     
     return GraceState(
-      weeklyGraceLeft: _service.getRemainingGraceTokens(),
-      maxGraceTokens: _service.getMaxGraceTokens(),
+      weeklyGraceLeft: weeklyLeft,
+      maxGraceTokens: maxTokens,
       lastResetDate: _service.getLastResetDate(),
     );
   }
@@ -75,9 +81,21 @@ class GraceNotifier extends Notifier<GraceState> {
   
   /// Reload state from settings service
   void _loadState() {
+    final maxTokens = _service.getMaxGraceTokens();
+    final usedThisWeek = _dailyLogService.getGraceUsedThisWeek();
+    final weeklyLeft = (maxTokens - usedThisWeek).clamp(0, maxTokens);
+
+    // Keep the persisted counter in sync so Settings UI stays consistent.
+    // (Source of truth for weekly usage is DailyLog.graceUsed within the week.)
+    if (_service.getRemainingGraceTokens() != weeklyLeft) {
+      // Fire-and-forget; state below is already correct.
+      // ignore: discarded_futures
+      _service.setRemainingGraceTokens(weeklyLeft);
+    }
+
     state = GraceState(
-      weeklyGraceLeft: _service.getRemainingGraceTokens(),
-      maxGraceTokens: _service.getMaxGraceTokens(),
+      weeklyGraceLeft: weeklyLeft,
+      maxGraceTokens: maxTokens,
       lastResetDate: _service.getLastResetDate(),
     );
   }
@@ -86,12 +104,35 @@ class GraceNotifier extends Notifier<GraceState> {
   /// Returns true if successfully used, false if none available
   /// Grace usage prevents streak breaks - user can miss a day without penalty
   Future<bool> useGraceToken() async {
-    final success = await _service.useGraceToken();
-    if (success) {
+    // Backward-compatible wrapper; prefer applyGraceForToday().
+    final today = app_date_utils.DateUtils.today;
+    return applyGraceForDate(today);
+  }
+
+  /// Apply grace to a specific date (typically today).
+  ///
+  /// Enforces max 2 grace uses per week by counting [DailyLog.graceUsed]
+  /// inside the current week window.
+  Future<bool> applyGraceForDate(DateTime date) async {
+    await _service.initialize();
+    await checkAndResetWeekly();
+
+    final existing = _dailyLogService.getLogForDate(date);
+    if (existing?.graceUsed == true) {
       _loadState();
       return true;
     }
-    return false;
+
+    final maxTokens = _service.getMaxGraceTokens();
+    final usedThisWeek = _dailyLogService.getGraceUsedThisWeek();
+    if (usedThisWeek >= maxTokens) {
+      _loadState();
+      return false;
+    }
+
+    await _dailyLogService.useGrace(date);
+    _loadState();
+    return true;
   }
   
   /// Manually trigger weekly reset (for testing/admin)

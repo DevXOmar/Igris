@@ -42,6 +42,13 @@ class PlayerProfile {
   @HiveField(3)
   final List<String> activeTitleIds;
 
+  /// IDs of titles currently equipped (gameplay effects + header display).
+  ///
+  /// This is the authoritative equip list going forward (max 2).
+  /// [activeTitleIds] is kept for backward compatibility with older saves.
+  @HiveField(15)
+  final List<String> equippedTitleIds;
+
   /// IDs of all titles that have been unlocked.
   @HiveField(4)
   final List<String> unlockedTitleIds;
@@ -90,6 +97,7 @@ class PlayerProfile {
     this.totalXP = 0,
     this.rank = 'E',
     this.activeTitleIds = const [],
+    this.equippedTitleIds = const [],
     this.unlockedTitleIds = const [],
     this.feats = const [],
     this.totalTasksCompleted = 0,
@@ -108,6 +116,7 @@ class PlayerProfile {
     int? totalXP,
     String? rank,
     List<String>? activeTitleIds,
+    List<String>? equippedTitleIds,
     List<String>? unlockedTitleIds,
     List<Feat>? feats,
     int? totalTasksCompleted,
@@ -125,6 +134,7 @@ class PlayerProfile {
       totalXP: totalXP ?? this.totalXP,
       rank: rank ?? this.rank,
       activeTitleIds: activeTitleIds ?? this.activeTitleIds,
+      equippedTitleIds: equippedTitleIds ?? this.equippedTitleIds,
       unlockedTitleIds: unlockedTitleIds ?? this.unlockedTitleIds,
       feats: feats ?? this.feats,
       totalTasksCompleted: totalTasksCompleted ?? this.totalTasksCompleted,

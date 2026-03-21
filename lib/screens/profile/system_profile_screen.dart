@@ -199,10 +199,10 @@ class _HunterIdentitySection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final name = ref.watch(progressionProvider.select((p) => p.name));
-    final activeTitleIds =
-        ref.watch(progressionProvider.select((p) => p.activeTitleIds));
-    final activeTitleName = activeTitleIds.isNotEmpty
-        ? TitleDefinitions.findById(activeTitleIds.first)?.name
+    final equippedTitleIds =
+      ref.watch(progressionProvider.select((p) => p.equippedTitleIds));
+    final activeTitleName = equippedTitleIds.isNotEmpty
+      ? TitleDefinitions.findById(equippedTitleIds.first)?.name
         : null;
     return HunterIdentityCard(name: name, activeTitleName: activeTitleName);
   }
@@ -237,10 +237,10 @@ class _HunterStatsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(progressionProvider);
+    final effectiveStats = ref.watch(effectiveStatsProvider);
     final stats = {
       ...PlayerProfile.defaultStats,
-      ...profile.stats,
+      ...effectiveStats,
     };
 
     return Container(
@@ -398,9 +398,9 @@ class _ActiveTitlesSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activeTitleIds =
-        ref.watch(progressionProvider.select((p) => p.activeTitleIds));
-    return ActiveTitlesRow(activeTitleIds: activeTitleIds);
+    final equippedTitleIds =
+        ref.watch(progressionProvider.select((p) => p.equippedTitleIds));
+    return ActiveTitlesRow(equippedTitleIds: equippedTitleIds);
   }
 }
 
@@ -990,13 +990,13 @@ class _StatCell extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ActiveTitlesRow extends ConsumerWidget {
-  final List<String> activeTitleIds;
+  final List<String> equippedTitleIds;
 
-  const ActiveTitlesRow({required this.activeTitleIds, super.key});
+  const ActiveTitlesRow({required this.equippedTitleIds, super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (activeTitleIds.isEmpty) {
+    if (equippedTitleIds.isEmpty) {
       return Text(
         'No titles equipped — unlock and equip titles below.',
         style: TextStyle(
@@ -1010,7 +1010,7 @@ class ActiveTitlesRow extends ConsumerWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: activeTitleIds.map((id) {
+        children: equippedTitleIds.map((id) {
           final def = TitleDefinitions.findById(id);
           return Padding(
             padding: const EdgeInsets.only(right: 8),

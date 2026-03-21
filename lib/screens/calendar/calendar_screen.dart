@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
 import '../../core/theme/igris_animations.dart';
 import '../../widgets/layout/igris_screen_scaffold.dart';
+import '../../widgets/grace_tokens_display.dart';
 import '../../widgets/ui/igris_ui.dart';
 
 /// Calendar screen with Igris UI integration
@@ -121,6 +122,25 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 // Completed day: glowing neonBlue dot
                 markerBuilder: (context, date, events) {
                   final log = ref.read(dailyLogProvider.notifier).getLogForDate(date);
+                  if (log != null && log.graceUsed) {
+                    return Positioned(
+                      bottom: 0,
+                      child: Text(
+                        '⚠',
+                        style: TextStyle(
+                          color: AppColors.royalGold,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          shadows: [
+                            BoxShadow(
+                              color: AppColors.royalGold.withValues(alpha: 0.55),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
                   if (log != null && log.completedTaskIds.isNotEmpty) {
                     return Positioned(
                       bottom: 2,
@@ -132,7 +152,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.neonBlue.withOpacity(0.6),
+                              color: AppColors.neonBlue.withValues(alpha: 0.6),
                               blurRadius: 4,
                               spreadRadius: 1,
                             ),
@@ -146,6 +166,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               ),
             ),
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              DesignSystem.spacing16,
+              0,
+              DesignSystem.spacing16,
+              DesignSystem.spacing12,
+            ),
+            child: const GraceTokensDisplay(),
           ),
           SizedBox(height: DesignSystem.spacing16),
           // Day details section
@@ -244,15 +273,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.shield_outlined,
+                              Icons.warning_amber_rounded,
                               size: 20,
-                              color: AppColors.deepBlue,
+                              color: AppColors.royalGold,
                             ),
                             SizedBox(width: DesignSystem.spacing8),
                             Text(
-                              'Grace token used',
+                              'Grace used (no XP)',
                               style: TextStyle(
-                                color: AppColors.deepBlue,
+                                color: AppColors.royalGold,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),
