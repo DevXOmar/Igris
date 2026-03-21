@@ -83,8 +83,8 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
     } else {
       // Task was not completed, now completing -> increase strength
       await ref.read(domainProvider.notifier).incrementDomainStrength(domainId);
-      if (!graceUsed) {
-        // Award XP for task completion
+      final shouldReward = await _service.markTaskRewarded(today, taskId);
+      if (!graceUsed && shouldReward) {
         await ref
             .read(progressionProvider.notifier)
             .recordTaskCompleted(taskId: taskId, domainId: domainId);
@@ -101,7 +101,8 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
       await _service.completeTask(state.today, taskId);
       await ref.read(domainProvider.notifier).incrementDomainStrength(domainId);
       final graceUsed = state.todayLog?.graceUsed ?? false;
-      if (!graceUsed) {
+      final shouldReward = await _service.markTaskRewarded(state.today, taskId);
+      if (!graceUsed && shouldReward) {
         await ref
             .read(progressionProvider.notifier)
             .recordTaskCompleted(taskId: taskId, domainId: domainId);

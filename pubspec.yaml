@@ -63,6 +63,11 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+
+  # App icon generation
+  flutter_launcher_icons: ^0.14.4
+  # Used by tool/icon/convert_app_icon.dart (JPEG -> 1024 PNG)
+  image: ^4.2.0
   
   # Hive Generator
   hive_generator: ^2.0.1
@@ -73,6 +78,7 @@ flutter:
 
   assets:
     - web/icons/
+    - assets/icon/
     # Rive hero animations — drop .riv files here to replace flutter_animate fallbacks
     - assets/rive/
     # Lottie celebration overlays — drop .json files here to replace fallbacks

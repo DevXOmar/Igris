@@ -124,8 +124,8 @@ class GraceNotifier extends Notifier<GraceState> {
     }
 
     final maxTokens = _service.getMaxGraceTokens();
-    final usedThisWeek = _dailyLogService.getGraceUsedThisWeek();
-    if (usedThisWeek >= maxTokens) {
+    final usedInThatWeek = _dailyLogService.getGraceUsedInWeek(date);
+    if (usedInThatWeek >= maxTokens) {
       _loadState();
       return false;
     }

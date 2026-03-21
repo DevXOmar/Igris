@@ -35,6 +35,26 @@ Run the following command to install all required packages:
 flutter pub get
 ```
 
+### 2.5 Set the App Icon (from a .png/.jpg/.jpeg)
+
+1) Put your source icon image here (recommended path + name):
+
+- `assets/icon/app_icon.png`
+
+2) Convert it into the PNG that icon generators require:
+
+```bash
+dart run tool/icon/convert_app_icon.dart
+```
+
+3) Generate the actual launcher icons for each platform:
+
+```bash
+dart run flutter_launcher_icons -f flutter_launcher_icons.yaml
+```
+
+This updates platform-specific icon files under `android/`, `ios/`, `web/`, and `macos/`.
+
 This will install:
 - flutter_riverpod (state management)
 - hive & hive_flutter (local storage)

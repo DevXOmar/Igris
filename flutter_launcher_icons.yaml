@@ -1,0 +1,29 @@
+# Igris launcher icon generation config
+#
+# Workflow:
+# 1) Put your source image at: assets/icon/app_icon.jpeg
+# 2) Run: dart run tool/icon/convert_app_icon.dart
+# 3) Run: dart run flutter_launcher_icons -f flutter_launcher_icons.yaml
+#
+# Notes:
+# - The generator consumes a PNG. The converter script creates
+#   assets/icon/app_icon_1024.png from your JPEG.
+# - If you prefer a different input filename, pass --input/--output.
+
+flutter_launcher_icons:
+  image_path: assets/icon/app_icon_1024.png
+
+  # Apple App Store disallows alpha channel in iOS app icons.
+  remove_alpha_ios: true
+
+  android: true
+  ios: true
+
+  web:
+    generate: true
+
+  macos:
+    generate: true
+
+  # This repo currently doesn't include a `windows/` platform folder.
+  # If you add Windows support later, re-enable Windows generation here.

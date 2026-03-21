@@ -34,7 +34,13 @@ migrate_working_dir/
 
 # Hive generated files
 *.g.dart
-*.lock
+
+# Hive runtime lock files (keep broad *.lock unignored so pubspec.lock, Podfile.lock, etc can be committed)
+**/*.hive.lock
+**/*.lock.hive
+
+# App icon intermediate (generated from assets/icon/app_icon.png)
+assets/icon/app_icon_1024.png
 
 # Symbolication related
 app.*.symbols

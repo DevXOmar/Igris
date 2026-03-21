@@ -844,9 +844,16 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     return max(0.0, bonus);
   }
 
-  double _allStatsBonusPercentForGains(PlayerProfile profile) {
+  double _allStatsBonusPercentForGains(
+    PlayerProfile profile, {
+    required bool weeklyBalanceMet,
+  }) {
     double bonus = 0.0;
     for (final id in profile.equippedTitleIds) {
+      if (id == 'rulers_authority' && weeklyBalanceMet) {
+        bonus += 0.10;
+        continue;
+      }
       final def = TitleDefinitions.findById(id);
       if (def == null) continue;
       for (final e in def.effects) {
@@ -925,11 +932,15 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     required Domain domain,
     required String taskId,
     required DateTime date,
+    required bool weeklyBalanceMet,
   }) {
     if (_taskStatGainUnits <= 0.0) return const {};
 
     final weights = _normalizedDomainWeights(domain);
-    final allBonus = _allStatsBonusPercentForGains(profile);
+    final allBonus = _allStatsBonusPercentForGains(
+      profile,
+      weeklyBalanceMet: weeklyBalanceMet,
+    );
     final byKeyBonus = _statBonusPercentByKeyForGains(profile);
 
     final gains = <String, int>{};
@@ -1008,8 +1019,15 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     required String taskId,
     required String domainId,
   }) async {
-    final domain = ref.read(domainProvider).getDomainById(domainId);
     final today = app_date_utils.DateUtils.today;
+    final todayLog = _dailyLogService.getLogForDate(today);
+    if (todayLog?.graceUsed == true) return;
+
+    final domain = ref.read(domainProvider).getDomainById(domainId);
+    final weeklyBalanceMet = _isWeeklyBalanceMet(
+      weeklyStats: ref.read(weeklyStatsProvider),
+      domainState: ref.read(domainProvider),
+    );
     final gains = domain == null
         ? const <String, int>{}
         : _computeTaskStatGains(
@@ -1017,6 +1035,7 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
             domain: domain,
             taskId: taskId,
             date: today,
+            weeklyBalanceMet: weeklyBalanceMet,
           );
 
     var profile = state.copyWith(

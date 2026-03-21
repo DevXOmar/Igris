@@ -20,10 +20,11 @@ class DomainService {
   
   /// Get a domain by ID
   Domain? getDomainById(String id) {
-    return _box.values.firstWhere(
-      (domain) => domain.id == id,
-      orElse: () => throw Exception('Domain not found'),
-    );
+    try {
+      return _box.values.firstWhere((domain) => domain.id == id);
+    } catch (_) {
+      return null;
+    }
   }
   
   /// Add a new domain

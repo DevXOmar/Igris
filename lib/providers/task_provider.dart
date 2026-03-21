@@ -147,10 +147,6 @@ final todayProgressProvider = Provider<Map<Domain, double>>((ref) {
   
   final progressMap = <Domain, double>{};
   
-  // Debug print
-  print('=== TODAY PROGRESS CALCULATION ===');
-  print('Active domains count: ${domainState.activeDomains.length}');
-  
   // Calculate progress for each active domain
   for (final domain in domainState.activeDomains) {
     // Get all tasks for this domain that should appear today
@@ -158,12 +154,9 @@ final todayProgressProvider = Provider<Map<Domain, double>>((ref) {
       task.domainId == domain.id
     ).toList();
     
-    print('Domain: ${domain.name}, Total tasks: ${domainTasks.length}');
-    
     // If no tasks, progress is 0
     if (domainTasks.isEmpty) {
       progressMap[domain] = 0.0;
-      print('  -> Progress: 0.0 (no tasks)');
       continue;
     }
     
@@ -172,15 +165,10 @@ final todayProgressProvider = Provider<Map<Domain, double>>((ref) {
       logState.isTaskCompletedToday(task.id)
     ).length;
     
-    print('  -> Completed: $completedCount / ${domainTasks.length}');
-    
     // Calculate progress as percentage (0.0 to 1.0)
     final progress = completedCount / domainTasks.length;
     progressMap[domain] = progress;
-    print('  -> Progress: $progress');
   }
-  
-  print('=== END PROGRESS CALCULATION ===\n');
-  
+
   return progressMap;
 });

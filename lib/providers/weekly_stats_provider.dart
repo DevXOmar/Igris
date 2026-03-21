@@ -63,10 +63,6 @@ final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
     final domainTotalForWeek = domainTasks.length * 7;
     int domainCompletedThisWeek = 0;
     
-    print('\n=== ${domain.name} ===');
-    print('Tasks in domain: ${domainTasks.length}');
-    print('TotalScheduledInstancesThisWeek: $domainTotalForWeek (${domainTasks.length} tasks × 7 days)');
-    
     // Count completed tasks from Monday through today
     for (int i = 0; i < 7; i++) {
       final date = startOfWeek.add(Duration(days: i));
@@ -91,8 +87,6 @@ final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
       }
     }
     
-    print('CompletedInstancesThisWeek: $domainCompletedThisWeek');
-    
     // Add this domain's total to overall total
     totalTasksThisWeek += domainTotalForWeek;
     
@@ -101,7 +95,6 @@ final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
         ? domainCompletedThisWeek / domainTotalForWeek 
         : 0.0;
     weeklyProgress[domain] = progress;
-    print('Progress: ${(progress * 100).toStringAsFixed(1)}% ($domainCompletedThisWeek/$domainTotalForWeek)');
   }
   
   // Calculate weekly score against FULL WEEK total
@@ -135,36 +128,37 @@ int _calculateStreak(
   DateTime checkDate = today;
   
   final domainState = ref.watch(domainProvider);
+
+  // If there are no active tasks at all, streak is defined as 0.
+  final activeTasks = taskState.tasks.where((task) {
+    final domain = domainState.getDomainById(task.domainId);
+    return domain != null && domain.isActive;
+  }).toList(growable: false);
+
+  if (activeTasks.isEmpty) return 0;
+
+  // Safety net: prevent unbounded lookback (e.g., malformed data).
+  const int maxLookbackDays = 3660; // ~10 years
+  var lookedBack = 0;
   
   // Go backwards from today, counting consecutive days that meet criteria
   while (true) {
+    if (lookedBack++ >= maxLookbackDays) break;
+    // Currently, tasks are treated as scheduled daily for active domains.
+    // If scheduling is added later, replace this with per-date logic.
+    final allTodayTasks = activeTasks;
+
     final log = logNotifier.getLogForDate(checkDate);
-    
-    // If no log exists for this date, streak ends
-    if (log == null) break;
-    
-    // Check if grace was used this day
-    if (log.graceUsed) {
+
+    // Check if grace was used this day.
+    if (log?.graceUsed == true) {
       streak++;
       checkDate = checkDate.subtract(const Duration(days: 1));
       continue;
     }
     
-    // Calculate daily completion percentage
-    // Get all tasks from active domains that should be done on this date
-    final allTodayTasks = taskState.tasks.where((task) {
-      final domain = domainState.getDomainById(task.domainId);
-      return domain != null && domain.isActive;
-    }).toList();
-    
-    if (allTodayTasks.isEmpty) {
-      // No tasks for this day - don't count it but don't break streak either
-      checkDate = checkDate.subtract(const Duration(days: 1));
-      continue;
-    }
-    
     final completedCount = allTodayTasks.where((task) => 
-      log.isTaskCompleted(task.id)
+      log?.isTaskCompleted(task.id) ?? false
     ).length;
     
     final completionPercentage = (completedCount / allTodayTasks.length) * 100;

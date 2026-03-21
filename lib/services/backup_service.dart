@@ -11,6 +11,7 @@ import '../models/domain.dart';
 import '../models/fuel_vault_entry.dart';
 import '../models/rival.dart';
 import '../models/task.dart';
+import '../core/utils/date_utils.dart' as app_date_utils;
 
 /// Current schema version.  Increment this when the backup JSON structure
 /// changes and add a matching migration branch inside [runMigration].
@@ -181,7 +182,8 @@ class BackupService {
     final dailyLogsBox = Hive.box<DailyLog>(_dailyLogsBox);
     for (final json in restored['dailyLogs'] as List<dynamic>) {
       final l = DailyLog.fromJson(json as Map<String, dynamic>);
-      await dailyLogsBox.put(l.date.toIso8601String(), l);
+      final key = app_date_utils.DateUtils.getDateKey(l.date);
+      await dailyLogsBox.put(key, l);
     }
 
     final rivalsBox = Hive.box<Rival>(_rivalsBox);

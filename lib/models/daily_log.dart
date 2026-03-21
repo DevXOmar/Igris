@@ -14,12 +14,20 @@ class DailyLog extends HiveObject {
   
   @HiveField(2)
   late bool graceUsed;
+
+  /// Tracks which tasks have already granted rewards for this date.
+  ///
+  /// Prevents XP/stat farming by rapid toggling of completion state.
+  @HiveField(3)
+  late List<String> rewardedTaskIds;
   
   DailyLog({
     required this.date,
     List<String>? completedTaskIds,
     this.graceUsed = false,
-  }) : completedTaskIds = completedTaskIds ?? [];
+    List<String>? rewardedTaskIds,
+  })  : completedTaskIds = completedTaskIds ?? [],
+        rewardedTaskIds = rewardedTaskIds ?? [];
   
   /// Check if a task is completed on this day
   bool isTaskCompleted(String taskId) {
@@ -37,17 +45,32 @@ class DailyLog extends HiveObject {
   void removeCompletedTask(String taskId) {
     completedTaskIds.remove(taskId);
   }
+
+  /// Returns true if this task has already granted rewards on this day.
+  bool hasGrantedRewardForTask(String taskId) {
+    return rewardedTaskIds.contains(taskId);
+  }
+
+  /// Marks this task as rewarded for this day.
+  /// Returns true if it was newly added.
+  bool markRewardGrantedForTask(String taskId) {
+    if (rewardedTaskIds.contains(taskId)) return false;
+    rewardedTaskIds.add(taskId);
+    return true;
+  }
   
   /// Create a copy of this daily log with modified fields
   DailyLog copyWith({
     DateTime? date,
     List<String>? completedTaskIds,
     bool? graceUsed,
+    List<String>? rewardedTaskIds,
   }) {
     return DailyLog(
       date: date ?? this.date,
       completedTaskIds: completedTaskIds ?? List.from(this.completedTaskIds),
       graceUsed: graceUsed ?? this.graceUsed,
+      rewardedTaskIds: rewardedTaskIds ?? List.from(this.rewardedTaskIds),
     );
   }
   
@@ -57,6 +80,7 @@ class DailyLog extends HiveObject {
       'date': date.toIso8601String(),
       'completedTaskIds': completedTaskIds,
       'graceUsed': graceUsed,
+      'rewardedTaskIds': rewardedTaskIds,
     };
   }
   
@@ -68,6 +92,9 @@ class DailyLog extends HiveObject {
           ?.map((e) => e as String)
           .toList(),
       graceUsed: json['graceUsed'] as bool? ?? false,
+      rewardedTaskIds: (json['rewardedTaskIds'] as List?)
+          ?.map((e) => e as String)
+          .toList(),
     );
   }
 }

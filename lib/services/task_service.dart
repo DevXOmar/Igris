@@ -22,10 +22,11 @@ class TaskService {
   
   /// Get a task by ID
   Task? getTaskById(String id) {
-    return _box.values.firstWhere(
-      (task) => task.id == id,
-      orElse: () => throw Exception('Task not found'),
-    );
+    try {
+      return _box.values.firstWhere((task) => task.id == id);
+    } catch (_) {
+      return null;
+    }
   }
   
   /// Get all recurring tasks
