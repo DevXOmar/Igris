@@ -1,6 +1,8 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -24,6 +26,52 @@ class SystemBootScreen extends ConsumerStatefulWidget {
   /// before the transition.
   const SystemBootScreen({super.key, this.identityName = ''});
 
+  /// Pre-warms the boot screen's first paint/text layout so the transition from
+  /// the name screen is less likely to hitch.
+  ///
+  /// This does not navigate or start any boot timers.
+  static void prewarm(ThemeData theme) {
+    final lines = const [
+      'Initializing system...',
+      'Binding identity...',
+      'Synchronizing neural link...',
+      'Calibrating stats...',
+      'System ready.',
+    ];
+
+    try {
+      // Warm up text layout.
+      final style = theme.textTheme.titleMedium?.copyWith(
+        color: AppColors.textSecondary.withValues(alpha: 0.9),
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.8,
+      );
+      if (style != null) {
+        for (final l in lines) {
+          final tp = TextPainter(
+            text: TextSpan(text: l, style: style),
+            textDirection: TextDirection.ltr,
+            maxLines: 1,
+          )..layout(maxWidth: 520);
+          // Touch the painter so it isn't tree-shaken as unused.
+          tp.computeLineMetrics();
+        }
+      }
+
+      // Warm up painters/shaders by recording one offscreen picture.
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      const size = Size(520, 820);
+      const ringSize = Size(180, 180);
+
+      const _SystemBackdropPainter(t: 0).paint(canvas, size);
+      const _AuraRingPainter(glow: 0.6).paint(canvas, ringSize);
+      recorder.endRecording();
+    } catch (_) {
+      // Best-effort warmup.
+    }
+  }
+
   @override
   ConsumerState<SystemBootScreen> createState() => _SystemBootScreenState();
 }
@@ -33,7 +81,7 @@ class _SystemBootScreenState extends ConsumerState<SystemBootScreen>
   late final AnimationController _loop = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 4200),
-  )..repeat();
+  );
 
   late final AnimationController _fade = AnimationController(
     vsync: this,
@@ -42,13 +90,22 @@ class _SystemBootScreenState extends ConsumerState<SystemBootScreen>
   );
 
   bool _started = false;
+  bool _fxReady = false;
 
   static const _minBootDuration = Duration(milliseconds: 2200);
 
   @override
   void initState() {
     super.initState();
-    _start();
+
+    // 3) Make the first frame lightweight: no animated backdrop, no repeated
+    // repaint loop. Enable the full FX after the first frame.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _fxReady = true);
+      _loop.repeat();
+      _start();
+    });
   }
 
   @override
@@ -126,16 +183,17 @@ class _SystemBootScreenState extends ConsumerState<SystemBootScreen>
             ),
             child: Stack(
               children: [
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: AnimatedBuilder(
-                      animation: _loop,
-                      builder: (context, _) => CustomPaint(
-                        painter: _SystemBackdropPainter(t: _loop.value),
+                if (_fxReady)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedBuilder(
+                        animation: _loop,
+                        builder: (context, _) => CustomPaint(
+                          painter: _SystemBackdropPainter(t: _loop.value),
+                        ),
                       ),
                     ),
                   ),
-                ),
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(
@@ -180,61 +238,76 @@ class _SystemBootScreenState extends ConsumerState<SystemBootScreen>
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Center(
-                                    child: AnimatedBuilder(
-                                      animation: _loop,
-                                      builder: (context, _) => _AuraRing(t: _loop.value),
-                                    )
-                                        .animate()
-                                        .fadeIn(
-                                          duration:
-                                              const Duration(milliseconds: 280),
-                                        )
-                                        .scale(
-                                          begin: const Offset(0.86, 0.86),
-                                          end: const Offset(1, 1),
-                                          duration:
-                                              const Duration(milliseconds: 360),
-                                          curve: Curves.easeOutCubic,
-                                        ),
+                                    child: _fxReady
+                                        ? AnimatedBuilder(
+                                            animation: _loop,
+                                            builder: (context, _) => _AuraRing(t: _loop.value),
+                                          )
+                                            .animate()
+                                            .fadeIn(
+                                              duration:
+                                                  const Duration(milliseconds: 280),
+                                            )
+                                            .scale(
+                                              begin: const Offset(0.86, 0.86),
+                                              end: const Offset(1, 1),
+                                              duration:
+                                                  const Duration(milliseconds: 360),
+                                              curve: Curves.easeOutCubic,
+                                            )
+                                        : const _AuraRing(t: 0),
                                   ),
                                   const SizedBox(height: DesignSystem.spacing24),
-                                  ...List.generate(lines.length, (i) {
-                                    final isLast = i == lines.length - 1;
-                                    final baseStyle = Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color: isLast
-                                              ? AppColors.neonBlue
-                                              : AppColors.textSecondary
-                                                  .withValues(alpha: 0.9),
-                                          fontWeight: isLast
-                                              ? FontWeight.w700
-                                              : FontWeight.w600,
-                                          letterSpacing: 0.8,
-                                        );
-
-                                    final delayMs = 320 + (i * 520);
-
-                                    return Align(
+                                  if (!_fxReady)
+                                    Align(
                                       alignment: Alignment.centerLeft,
-                                      child: Text(lines[i], style: baseStyle),
+                                      child: Text(
+                                        lines.first,
+                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                              color: AppColors.textSecondary.withValues(alpha: 0.9),
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 0.8,
+                                            ),
+                                      ),
                                     )
-                                        .animate()
-                                        .fadeIn(
-                                          duration:
-                                              const Duration(milliseconds: 320),
-                                          delay: Duration(milliseconds: delayMs),
-                                        )
-                                        .slideY(
-                                          begin: 0.18,
-                                          end: 0,
-                                          curve: Curves.easeOutCubic,
-                                          duration:
-                                              const Duration(milliseconds: 320),
-                                          delay: Duration(milliseconds: delayMs),
-                                        );
-                                  }),
+                                  else
+                                    ...List.generate(lines.length, (i) {
+                                      final isLast = i == lines.length - 1;
+                                      final baseStyle = Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            color: isLast
+                                                ? AppColors.neonBlue
+                                                : AppColors.textSecondary
+                                                    .withValues(alpha: 0.9),
+                                            fontWeight: isLast
+                                                ? FontWeight.w700
+                                                : FontWeight.w600,
+                                            letterSpacing: 0.8,
+                                          );
+
+                                      final delayMs = 320 + (i * 520);
+
+                                      return Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(lines[i], style: baseStyle),
+                                      )
+                                          .animate()
+                                          .fadeIn(
+                                            duration:
+                                                const Duration(milliseconds: 320),
+                                            delay: Duration(milliseconds: delayMs),
+                                          )
+                                          .slideY(
+                                            begin: 0.18,
+                                            end: 0,
+                                            curve: Curves.easeOutCubic,
+                                            duration:
+                                                const Duration(milliseconds: 320),
+                                            delay: Duration(milliseconds: delayMs),
+                                          );
+                                    }),
                                 ],
                               ),
                             ),

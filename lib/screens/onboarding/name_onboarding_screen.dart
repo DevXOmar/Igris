@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -49,8 +50,15 @@ class _NameOnboardingScreenState extends ConsumerState<NameOnboardingScreen> {
 
     try {
       FocusManager.instance.primaryFocus?.unfocus();
-      // Let the button enter loading state before route transition.
-      await Future<void>.delayed(const Duration(milliseconds: 16));
+
+      final theme = Theme.of(context);
+      // 1) Delay navigation by exactly 1 frame so the button can visibly enter
+      // loading state and the keyboard can dismiss cleanly.
+      await SchedulerBinding.instance.endOfFrame;
+
+      // 2) Pre-warm the boot screen (paints/text layout) before navigation so
+      // the first frame is less likely to hitch.
+      SystemBootScreen.prewarm(theme);
 
       if (!mounted) return;
       await Navigator.of(context).push(_bootRoute(identityName: name));

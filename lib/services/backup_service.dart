@@ -54,10 +54,10 @@ class BackupService {
 
   // ── Export ─────────────────────────────────────────────────────────────────
 
-  /// Reads every Hive box, serialises the data, and writes a JSON file to the
-  /// application documents directory.
+  /// Reads every Hive box, serialises the data, and writes a JSON file using
+  /// the platform's user-visible save mechanism (Downloads / file save dialog).
   ///
-  /// Returns the absolute path of the written file.
+  /// Returns the saved path/URI (platform-dependent).
   Future<String> exportBackup() async {
     final domainObjects = Hive.box<Domain>(_domainsBox).values.toList();
     final taskObjects = Hive.box<Task>(_tasksBox).values.toList();

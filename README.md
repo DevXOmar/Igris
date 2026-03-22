@@ -202,6 +202,18 @@ IGRIS.
 - **Tests:** run `flutter test` (this repo's unit tests currently pass).
 - **Run:** `flutter run -d <device>` (choose an emulator, desktop target, or web).
 
+## Recent Changes (v1.1.1)
+
+- Version bumped to **1.1.1+1** — this release contains several UX and system improvements.
+- Onboarding: first-launch now shows a cinematic name entry flow. The app asks for your name on first run and then shows a short, immersive `System Awakening` boot animation while the app warms providers and binds identity (smooth transition; avoids UI flicker).
+- Cinematic Boot: added `SystemBootScreen` — a centered aura ring with staggered system messages that runs while initialization occurs in parallel.
+- Settings: the About → Version row now reads the runtime app version (no hardcoded value).
+- Backup & Restore: backup/restore system upgraded to schema v2 with migration, preview/confirm UI and atomic restore/rollback semantics.
+- Stats & Progression: refactored stats to allocation-only storage + pure derived calculation; streak milestones and XP rebalance updates included.
+- Rivals: network overlay now supports edit/delete actions and detail views respect the latest state.
+
+
+
 **Backup & Restore**
 
 - Igris provides a full JSON backup/export and atomic restore flow (schema v2). Read the full specification and safety guarantees in [BACKUP_SYSTEM.md](BACKUP_SYSTEM.md).

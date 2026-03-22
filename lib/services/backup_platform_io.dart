@@ -1,11 +1,42 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:file_saver/file_saver.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// Saves [jsonContent] to the app documents directory and returns the file path.
+/// Saves [jsonContent] as a user-visible file and returns the saved path/URI.
+///
+/// On Android this is written to public storage (e.g. Downloads) via
+/// platform APIs (scoped storage compliant). On desktop/iOS this uses the
+/// platform save mechanism provided by `file_saver`.
 Future<String> saveBackupFile(String jsonContent, String fileName) async {
+  // In `flutter test`, plugin channels are often not registered.
+  // Fall back to app documents so tests can run deterministically.
+  if (const bool.fromEnvironment('FLUTTER_TEST')) {
+    return _saveBackupFileToAppDocuments(jsonContent, fileName);
+  }
+
+  final baseName = fileName.replaceFirst(RegExp(r'\.json\$', caseSensitive: false), '');
+  final bytes = Uint8List.fromList(utf8.encode(jsonContent));
+
+  final savedTo = await FileSaver.instance.saveFile(
+    name: baseName,
+    bytes: bytes,
+    fileExtension: 'json',
+    mimeType: MimeType.custom,
+    customMimeType: 'application/json',
+  );
+
+  final normalized = savedTo.trim();
+  if (normalized.isEmpty || normalized.toLowerCase().contains('something went wrong')) {
+    throw Exception('Unable to save backup file to user storage.');
+  }
+  return normalized;
+}
+
+Future<String> _saveBackupFileToAppDocuments(String jsonContent, String fileName) async {
   final dir = await getApplicationDocumentsDirectory();
   final file = File('${dir.path}/$fileName');
   await file.writeAsString(jsonContent);
