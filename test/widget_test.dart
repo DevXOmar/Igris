@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
 import 'package:igris/main.dart';
+import 'package:igris/screens/home/home_screen.dart';
 import 'package:igris/models/daily_log.dart';
 import 'package:igris/models/domain.dart';
 import 'package:igris/models/feat.dart';
@@ -10,6 +12,8 @@ import 'package:igris/models/fuel_vault_entry.dart';
 import 'package:igris/models/player_profile.dart';
 import 'package:igris/models/rival.dart';
 import 'package:igris/models/task.dart';
+import 'package:igris/providers/progression_provider.dart';
+import 'package:igris/widgets/ui/igris_button.dart';
 
 void main() {
   late Directory hiveTestDir;
@@ -60,7 +64,21 @@ void main() {
     // Pump an extra frame to flush them so the test doesn't fail on teardown.
     await tester.pump(const Duration(milliseconds: 1));
 
-    // Verify that the app has loaded (check for "Igris" title)
-    expect(find.text('Igris'), findsOneWidget);
+    // First launch: name is empty, so onboarding should be shown.
+    expect(find.text('Welcome'), findsOneWidget);
+    expect(find.text("What's your name?"), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
+
+    final container = ProviderScope.containerOf(tester.element(find.byType(IgrisApp)));
+    await container.read(progressionProvider.notifier).updateName('Test User');
+
+    // Allow async profile save + root rebuild.
+    await tester.pump();
+    for (int i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    // Main app should now be visible.
+    expect(find.byType(HomeScreen), findsOneWidget);
   });
 }

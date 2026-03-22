@@ -87,6 +87,13 @@ class PlayerProfile {
   @HiveField(9)
   final int lastStreakMilestoneAwarded;
 
+  /// Set of streak milestones already awarded/unlocked.
+  ///
+  /// Stored as a list for Hive compatibility; treat as a set.
+  /// Example: [7, 14, 30, 45].
+  @HiveField(17)
+  final List<int> achievedStreakMilestones;
+
   /// Editable hunter name shown on the profile screen.
   @HiveField(10)
   final String name;
@@ -124,6 +131,7 @@ class PlayerProfile {
     this.weeklyGoalsCompleted = 0,
     this.longestStreak = 0,
     this.lastStreakMilestoneAwarded = 0,
+    this.achievedStreakMilestones = const <int>[],
     this.name = '',
     this.unspentStatPoints = 0,
     this.statPointsAwarded = 0,
@@ -144,6 +152,7 @@ class PlayerProfile {
         'weeklyGoalsCompleted': weeklyGoalsCompleted,
         'longestStreak': longestStreak,
         'lastStreakMilestoneAwarded': lastStreakMilestoneAwarded,
+        'achievedStreakMilestones': achievedStreakMilestones,
         'name': name,
         'unspentStatPoints': unspentStatPoints,
         'statPointsAwarded': statPointsAwarded,
@@ -174,6 +183,11 @@ class PlayerProfile {
           )
         : Map<String, int>.from(PlayerProfile.defaultStatAllocations);
 
+    final achievedJson = json['achievedStreakMilestones'];
+    final achieved = (achievedJson is List)
+        ? achievedJson.whereType<num>().map((e) => e.toInt()).toList()
+        : const <int>[];
+
     return PlayerProfile(
       level: (json['level'] as num?)?.toInt() ?? 1,
       currentXP: (json['currentXP'] as num?)?.toInt() ?? 0,
@@ -190,10 +204,12 @@ class PlayerProfile {
               const <String>[],
       feats: feats,
       totalTasksCompleted: (json['totalTasksCompleted'] as num?)?.toInt() ?? 0,
-      weeklyGoalsCompleted: (json['weeklyGoalsCompleted'] as num?)?.toInt() ?? 0,
+      weeklyGoalsCompleted:
+          (json['weeklyGoalsCompleted'] as num?)?.toInt() ?? 0,
       longestStreak: (json['longestStreak'] as num?)?.toInt() ?? 0,
       lastStreakMilestoneAwarded:
           (json['lastStreakMilestoneAwarded'] as num?)?.toInt() ?? 0,
+      achievedStreakMilestones: achieved,
       name: (json['name'] as String?) ?? '',
       unspentStatPoints: (json['unspentStatPoints'] as num?)?.toInt() ?? 0,
       statPointsAwarded: (json['statPointsAwarded'] as num?)?.toInt() ?? 0,
@@ -221,6 +237,7 @@ class PlayerProfile {
     int? weeklyGoalsCompleted,
     int? longestStreak,
     int? lastStreakMilestoneAwarded,
+    List<int>? achievedStreakMilestones,
     String? name,
     int? unspentStatPoints,
     int? statPointsAwarded,
@@ -241,6 +258,8 @@ class PlayerProfile {
       longestStreak: longestStreak ?? this.longestStreak,
       lastStreakMilestoneAwarded:
           lastStreakMilestoneAwarded ?? this.lastStreakMilestoneAwarded,
+      achievedStreakMilestones:
+          achievedStreakMilestones ?? this.achievedStreakMilestones,
       name: name ?? this.name,
       unspentStatPoints: unspentStatPoints ?? this.unspentStatPoints,
       statPointsAwarded: statPointsAwarded ?? this.statPointsAwarded,

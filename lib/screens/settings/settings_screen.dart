@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
 import '../../providers/grace_provider.dart';
@@ -22,6 +23,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _backupService = BackupService();
   bool _isBackingUp = false;
   bool _isRestoring = false;
+  String _appVersion = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() {
+        final build = info.buildNumber.trim();
+        _appVersion = build.isEmpty ? info.version : '${info.version}+$build';
+      });
+    } catch (_) {
+    }
+  }
 
   Future<void> _runBackup() async {
     setState(() => _isBackingUp = true);
@@ -394,7 +414,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   SizedBox(height: DesignSystem.spacing16),
                   _buildInfoRow(context, 'App Name', 'Igris'),
                   SizedBox(height: DesignSystem.spacing8),
-                  _buildInfoRow(context, 'Version', '1.0.0'),
+                  _buildInfoRow(context, 'Version', _appVersion.isEmpty ? '—' : _appVersion),
                   SizedBox(height: DesignSystem.spacing16),
                   Divider(color: AppColors.neonBlue.withValues(alpha: 0.2)),
                   SizedBox(height: DesignSystem.spacing8),

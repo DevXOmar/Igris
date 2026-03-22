@@ -52,12 +52,12 @@ class RivalDetailScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined, color: AppColors.neonBlue),
-            onPressed: () => _openEdit(context),
+            onPressed: () => _openEdit(context, currentRival),
             tooltip: 'Edit',
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: AppColors.bloodRed),
-            onPressed: () => _confirmDelete(context, ref),
+            onPressed: () => _confirmDelete(context, ref, currentRival),
             tooltip: 'Delete',
           ),
         ],
@@ -179,7 +179,7 @@ class RivalDetailScreen extends ConsumerWidget {
                     variant: IgrisButtonVariant.outline,
                     icon: Icons.edit_outlined,
                     fullWidth: true,
-                    onPressed: () => _openEdit(context),
+                    onPressed: () => _openEdit(context, currentRival),
                   ),
                 ),
                 SizedBox(width: DesignSystem.spacing12),
@@ -189,7 +189,7 @@ class RivalDetailScreen extends ConsumerWidget {
                     variant: IgrisButtonVariant.destructive,
                     icon: Icons.delete_outline,
                     fullWidth: true,
-                    onPressed: () => _confirmDelete(context, ref),
+                    onPressed: () => _confirmDelete(context, ref, currentRival),
                   ),
                 ),
               ],
@@ -200,16 +200,16 @@ class RivalDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _openEdit(BuildContext context) {
+  void _openEdit(BuildContext context, Rival existing) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => AddRivalBottomSheet(existing: rival),
+      builder: (_) => AddRivalBottomSheet(existing: existing),
     );
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref) {
+  void _confirmDelete(BuildContext context, WidgetRef ref, Rival existing) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -219,7 +219,7 @@ class RivalDetailScreen extends ConsumerWidget {
           style: TextStyle(color: AppColors.textPrimary),
         ),
         content: Text(
-          '${rival.name} will be permanently removed from your board.',
+          '${existing.name} will be permanently removed from your board.',
           style: const TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
@@ -230,7 +230,7 @@ class RivalDetailScreen extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () async {
-              await ref.read(rivalProvider.notifier).deleteRival(rival.id);
+              await ref.read(rivalProvider.notifier).deleteRival(existing.id);
               if (ctx.mounted) Navigator.of(ctx).pop();
               if (context.mounted) Navigator.of(context).pop();
             },

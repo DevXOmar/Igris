@@ -413,16 +413,30 @@ class TitleDefinitions {
       checkCondition: (c) => c.profile.longestStreak >= 30,
     ),
     TitleDefinition(
+      id: 'unbreakable',
+      name: 'Unbreakable',
+      description: 'A streak that refuses to end.',
+      unlockCondition: '90-day streak',
+      icon: Icons.verified_user_outlined,
+      effects: const [
+        TitleEffect.note('Unlocked for reaching a 90-day streak.'),
+      ],
+      checkCondition: (c) => c.profile.longestStreak >= 90,
+    ),
+    TitleDefinition(
       id: 'unyielding_rythm',
       name: 'The Unyielding Rythm',
-      description: 'Controlled grace. Unbroken execution. Three weeks straight.',
-      unlockCondition: 'Use at most 1 grace per week and maintain streak for 3 weeks',
+      description:
+          'Controlled grace. Unbroken execution. Three weeks straight.',
+      unlockCondition:
+          'Use at most 1 grace per week and maintain streak for 3 weeks',
       icon: Icons.multiline_chart,
       effects: const [
         TitleEffect.statBonus(statKey: 'discipline', percent: 0.20),
         TitleEffect.streakXpBonus(0.10),
         TitleEffect.xpBonus(0.05),
-        TitleEffect.note('Grace preserves your streak but grants no XP for that day.'),
+        TitleEffect.note(
+            'Grace preserves your streak but grants no XP for that day.'),
       ],
       checkCondition: (c) => c.hasUnyieldingRythmForThreeWeeks,
     ),
@@ -444,7 +458,8 @@ class TitleDefinitions {
       unlockCondition: '100 total tasks',
       icon: Icons.flash_on,
       effects: const [
-        TitleEffect.taskXpBonus(category: TaskXpCategory.taskComplete, percent: 0.15),
+        TitleEffect.taskXpBonus(
+            category: TaskXpCategory.taskComplete, percent: 0.15),
         TitleEffect.xpBonus(0.05),
       ],
       checkCondition: (c) => c.profile.totalTasksCompleted >= 100,
@@ -498,7 +513,8 @@ class TitleDefinitions {
       effects: const [
         // Vitality maps to Endurance in this build.
         TitleEffect.statBonus(statKey: 'endurance', percent: 0.15),
-        TitleEffect.taskXpBonus(category: TaskXpCategory.fitness, percent: 0.10),
+        TitleEffect.taskXpBonus(
+            category: TaskXpCategory.fitness, percent: 0.10),
       ],
       checkCondition: (c) =>
           c.sumDomainStrengthWhere((n) => _fitnessRe.hasMatch(n)) >= 100,
@@ -521,9 +537,11 @@ class TitleDefinitions {
       unlockCondition: 'Max out one domain',
       icon: Icons.flag_outlined,
       effects: const [
-        TitleEffect.taskXpBonus(category: TaskXpCategory.dominantDomain, percent: 0.20),
+        TitleEffect.taskXpBonus(
+            category: TaskXpCategory.dominantDomain, percent: 0.20),
       ],
-      checkCondition: (c) => c.anyDomainStrengthAtLeast(_domainConquerorStrengthThreshold),
+      checkCondition: (c) =>
+          c.anyDomainStrengthAtLeast(_domainConquerorStrengthThreshold),
     ),
     TitleDefinition(
       id: 's_rank_candidate_star',
@@ -593,7 +611,8 @@ class TitleDefinitions {
         TitleEffect.statBonus(statKey: 'presence', percent: 0.20),
         TitleEffect.xpBonus(0.10),
       ],
-      checkCondition: (c) => c.profile.level >= 100 || c.profile.feats.isNotEmpty,
+      checkCondition: (c) =>
+          c.profile.level >= 100 || c.profile.feats.isNotEmpty,
     ),
     TitleDefinition(
       id: 'kamish_slayer_reworked',
@@ -602,7 +621,8 @@ class TitleDefinitions {
       unlockCondition: 'Clear 100+ backlog/overdue tasks',
       icon: Icons.task_alt,
       effects: const [
-        TitleEffect.taskXpBonus(category: TaskXpCategory.oneTime, percent: 0.20),
+        TitleEffect.taskXpBonus(
+            category: TaskXpCategory.oneTime, percent: 0.20),
       ],
       checkCondition: (c) => c.distinctOneTimeTasksCompleted >= 100,
     ),
@@ -618,7 +638,8 @@ class TitleDefinitions {
         TitleEffect.streakXpBonus(0.10),
       ],
       checkCondition: (c) =>
-          c.profile.longestStreak >= 365 && c.profile.weeklyGoalsCompleted >= 12,
+          c.profile.longestStreak >= 365 &&
+          c.profile.weeklyGoalsCompleted >= 12,
     ),
   ];
 
@@ -639,13 +660,15 @@ class TitleDefinitions {
 class XpRewards {
   XpRewards._();
 
-  static const int taskComplete = 10;
-  static const int domainComplete = 30;
-  static const int weeklyGoal = 75;
+  static const int taskComplete = 15;
+  static const int domainComplete = 25;
+  static const int weeklyGoal = 100;
   static const int streak7 = 50;
   static const int streak14 = 100;
   static const int streak21 = 150;
   static const int streak30 = 200;
+  static const int streak45 = 300;
+  static const int streak60 = 400;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -709,10 +732,24 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
       equippedSource,
       knownIds: knownIds,
     );
-    final sanitizedUnlocked =
-        profile.unlockedTitleIds.where(knownIds.contains).toList(growable: false);
+    final sanitizedUnlocked = profile.unlockedTitleIds
+        .where(knownIds.contains)
+        .toList(growable: false);
 
     var next = profile;
+
+    // ── Migration: legacy single milestone int -> achieved set ────────────
+    if (next.achievedStreakMilestones.isEmpty &&
+        next.lastStreakMilestoneAwarded > 0) {
+      const legacy = [7, 14, 21, 30];
+      final migrated = legacy
+          .where((m) => m <= next.lastStreakMilestoneAwarded)
+          .toList(growable: false);
+      next = next.copyWith(achievedStreakMilestones: migrated);
+      Future(() async {
+        await _service.saveProfile(next);
+      });
+    }
 
     // ── Migration: legacy final stats -> allocation-only model ───────────
     final hasAnyAllocations = next.statAllocations.values.any((v) => v != 0);
@@ -802,7 +839,8 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   }) {
     if (base <= 0) return base;
     final effects = _aggregateEquippedTitleEffects(state);
-    final bonus = effects.xpBonusPercent + (isStreak ? effects.streakXpBonusPercent : 0.0);
+    final bonus = effects.xpBonusPercent +
+        (isStreak ? effects.streakXpBonusPercent : 0.0);
     final awarded = (base * (1.0 + bonus)).round();
     return awarded <= 0 ? 1 : awarded;
   }
@@ -834,7 +872,8 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     return active.any((d) => d.id == domainId && d.strength == maxStrength);
   }
 
-  ({bool isStudy, bool isWork, bool isFitness}) _domainTagsFor(String domainName) {
+  ({bool isStudy, bool isWork, bool isFitness}) _domainTagsFor(
+      String domainName) {
     final n = domainName.trim().toLowerCase();
     return (
       isStudy: TitleDefinitions._studyRe.hasMatch(n),
@@ -851,7 +890,9 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     double bonus = 0.0;
     final isOneTime = task.isRecurring == false;
     final isDominant = domain != null && _isDominantDomain(domain.id);
-    final tags = domain != null ? _domainTagsFor(domain.name) : (isStudy: false, isWork: false, isFitness: false);
+    final tags = domain != null
+        ? _domainTagsFor(domain.name)
+        : (isStudy: false, isWork: false, isFitness: false);
 
     for (final id in profile.equippedTitleIds) {
       final def = TitleDefinitions.findById(id);
@@ -861,7 +902,8 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
         final c = e.taskXpCategory;
         if (c == TaskXpCategory.taskComplete) bonus += e.percent;
         if (c == TaskXpCategory.oneTime && isOneTime) bonus += e.percent;
-        if (c == TaskXpCategory.dominantDomain && isDominant) bonus += e.percent;
+        if (c == TaskXpCategory.dominantDomain && isDominant)
+          bonus += e.percent;
         if (c == TaskXpCategory.study && tags.isStudy) bonus += e.percent;
         if (c == TaskXpCategory.work && tags.isWork) bonus += e.percent;
         if (c == TaskXpCategory.fitness && tags.isFitness) bonus += e.percent;
@@ -910,8 +952,7 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   // ── Formula: requiredXP = baseXP * level^1.5 ────────────────────────────
 
   /// XP required to advance FROM [level] to [level]+1.
-  int requiredXPForLevel(int level) =>
-      (_baseXP * pow(level, 1.5)).floor();
+  int requiredXPForLevel(int level) => (_baseXP * pow(level, 1.5)).floor();
 
   // ── Public action hooks ──────────────────────────────────────────────────
 
@@ -974,8 +1015,8 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   /// Award 75 XP for completing the weekly campaign (score = 100%).
   Future<void> onWeeklyGoalCompleted() async {
     var profile = state;
-    profile =
-        profile.copyWith(weeklyGoalsCompleted: profile.weeklyGoalsCompleted + 1);
+    profile = profile.copyWith(
+        weeklyGoalsCompleted: profile.weeklyGoalsCompleted + 1);
     await _service.saveProfile(profile);
     state = profile;
     await addXP(_applyWeeklyGoalXpEffects(XpRewards.weeklyGoal));
@@ -1061,7 +1102,8 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
 
     // Harden: compute unspent from the current total earned, ignoring any
     // mismatched UI-provided value.
-    final currentSpent = state.statAllocations.values.fold<int>(0, (a, b) => a + b);
+    final currentSpent =
+        state.statAllocations.values.fold<int>(0, (a, b) => a + b);
     final totalEarned = state.unspentStatPoints + currentSpent;
     final newSpent = normalizedAllocations.values.fold<int>(0, (a, b) => a + b);
     final computedUnspent = max(0, totalEarned - newSpent);
@@ -1123,27 +1165,65 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   // ── Internal helpers ─────────────────────────────────────────────────────
 
   Future<void> _checkStreakMilestones(int streak) async {
-    const milestones = [7, 14, 21, 30];
-    for (final m in milestones) {
-      if (streak >= m && state.lastStreakMilestoneAwarded < m) {
-        int xp = 0;
-        if (m == 7) xp = XpRewards.streak7;
-        if (m == 14) xp = XpRewards.streak14;
-        if (m == 21) xp = XpRewards.streak21;
-        if (m == 30) xp = XpRewards.streak30;
+    final milestoneXp = <int, int>{
+      7: XpRewards.streak7,
+      14: XpRewards.streak14,
+      21: XpRewards.streak21,
+      30: XpRewards.streak30,
+      45: XpRewards.streak45,
+      60: XpRewards.streak60,
+    };
 
-        // Mark milestone before awarding to prevent re-entry
-        final updated = state.copyWith(lastStreakMilestoneAwarded: m);
-        await _service.saveProfile(updated);
-        state = updated;
+    const titleMilestone = 90;
+    const titleId = 'unbreakable';
 
-        await addXP(xp, isStreakAward: true);
+    final achieved = state.achievedStreakMilestones.toSet();
 
-        // Fire streak animation
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          ref.read(animationServiceProvider.notifier).onStreakMilestone();
-        });
-      }
+    final orderedMilestones = milestoneXp.keys.toList()..sort();
+    for (final m in orderedMilestones) {
+      if (streak < m) continue;
+      if (achieved.contains(m)) continue;
+
+      achieved.add(m);
+      final achievedList = achieved.toList()..sort();
+      final updated = state.copyWith(
+        achievedStreakMilestones: achievedList.toList(growable: false),
+        lastStreakMilestoneAwarded: m > state.lastStreakMilestoneAwarded
+            ? m
+            : state.lastStreakMilestoneAwarded,
+      );
+      await _service.saveProfile(updated);
+      state = updated;
+
+      await addXP(milestoneXp[m]!, isStreakAward: true);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(animationServiceProvider.notifier).onStreakMilestone();
+      });
+    }
+
+    // 90-day milestone: unlock a title (no XP).
+    if (streak >= titleMilestone && !achieved.contains(titleMilestone)) {
+      achieved.add(titleMilestone);
+      final achievedList = achieved.toList()..sort();
+      final unlocked = state.unlockedTitleIds.contains(titleId)
+          ? state.unlockedTitleIds
+          : [...state.unlockedTitleIds, titleId];
+
+      final updated = state.copyWith(
+        achievedStreakMilestones: achievedList.toList(growable: false),
+        lastStreakMilestoneAwarded:
+            titleMilestone > state.lastStreakMilestoneAwarded
+                ? titleMilestone
+                : state.lastStreakMilestoneAwarded,
+        unlockedTitleIds: unlocked,
+      );
+      await _service.saveProfile(updated);
+      state = updated;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(animationServiceProvider.notifier).onStreakMilestone();
+      });
     }
   }
 
@@ -1158,8 +1238,7 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
       newRank = 'D';
     }
     // D → C: 14-day streak
-    if (_rankIndex(newRank) < _rankIndex('C') &&
-        profile.longestStreak >= 14) {
+    if (_rankIndex(newRank) < _rankIndex('C') && profile.longestStreak >= 14) {
       newRank = 'C';
     }
     // C → B: 3 weekly campaigns
@@ -1172,8 +1251,7 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
       newRank = 'A';
     }
     // A → S: 30-day streak
-    if (_rankIndex(newRank) < _rankIndex('S') &&
-        profile.longestStreak >= 30) {
+    if (_rankIndex(newRank) < _rankIndex('S') && profile.longestStreak >= 30) {
       newRank = 'S';
     }
     // National and Monarch require manual feat grants — not auto-promoted here
@@ -1312,5 +1390,7 @@ final xpProgressProvider = Provider<double>((ref) {
 /// Convenience computed provider: XP needed for next level.
 final xpRequiredProvider = Provider<int>((ref) {
   final profile = ref.watch(progressionProvider);
-  return ref.read(progressionProvider.notifier).requiredXPForLevel(profile.level);
+  return ref
+      .read(progressionProvider.notifier)
+      .requiredXPForLevel(profile.level);
 });

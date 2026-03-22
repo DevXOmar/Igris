@@ -17,7 +17,9 @@ import 'models/rival.dart';
 import 'models/feat.dart';
 import 'models/player_profile.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/onboarding/name_onboarding_screen.dart';
 import 'services/demo_seed_service.dart';
+import 'providers/progression_provider.dart';
 import 'widgets/animations/animation_overlay.dart';
 
 class _AppScrollBehavior extends MaterialScrollBehavior {
@@ -43,10 +45,10 @@ class _AppScrollBehavior extends MaterialScrollBehavior {
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Hive
   await Hive.initFlutter();
-  
+
   // Register Hive Adapters
   Hive.registerAdapter(DomainAdapter());
   Hive.registerAdapter(TaskAdapter());
@@ -55,7 +57,7 @@ void main() async {
   Hive.registerAdapter(RivalAdapter());
   Hive.registerAdapter(FeatAdapter());
   Hive.registerAdapter(PlayerProfileAdapter());
-  
+
   // Open Hive Boxes
   await Hive.openBox<Domain>('domainsBox');
   await Hive.openBox<Task>('tasksBox');
@@ -68,7 +70,7 @@ void main() async {
   const bool enableDemoSeed =
       bool.fromEnvironment('IGRIS_DEMO_SEED', defaultValue: false);
   await DemoSeedService.maybeSeed(enabled: enableDemoSeed);
-  
+
   runApp(
     // ProviderScope is required for Riverpod
     // All providers must be descendants of ProviderScope
@@ -126,11 +128,16 @@ class IgrisApp extends StatelessWidget {
 /// widgets on top of the full app when events are fired from anywhere in the
 /// widget tree. All overlays are [IgnorePointer] — user interaction is never
 /// blocked during an animation.
-class _IgrisRoot extends StatelessWidget {
+class _IgrisRoot extends ConsumerWidget {
   const _IgrisRoot();
 
   @override
-  Widget build(BuildContext context) {
-    return const AnimationOverlay(child: HomeScreen());
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = ref.watch(progressionProvider.select((p) => p.name));
+    final needsName = name.trim().isEmpty;
+
+    return AnimationOverlay(
+      child: needsName ? const NameOnboardingScreen() : const HomeScreen(),
+    );
   }
 }

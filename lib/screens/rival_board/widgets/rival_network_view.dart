@@ -16,8 +16,15 @@ import '../../../widgets/ui/igris_card.dart';
 /// - Tap outside -> collapse
 class RivalNetworkView extends StatefulWidget {
   final List<Rival> rivals;
+  final void Function(Rival rival)? onEdit;
+  final void Function(Rival rival)? onDelete;
 
-  const RivalNetworkView({required this.rivals, super.key});
+  const RivalNetworkView({
+    required this.rivals,
+    this.onEdit,
+    this.onDelete,
+    super.key,
+  });
 
   @override
   State<RivalNetworkView> createState() => _RivalNetworkViewState();
@@ -104,7 +111,8 @@ class _RivalNetworkViewState extends State<RivalNetworkView>
 
         final rawPositions = <String, Offset>{
           for (final n in nodes)
-            n.id: Offset(n.position.dx * size.width, n.position.dy * size.height),
+            n.id:
+                Offset(n.position.dx * size.width, n.position.dy * size.height),
         };
 
         final positions = _resolveNodeCollisions(
@@ -183,16 +191,15 @@ class _RivalNetworkViewState extends State<RivalNetworkView>
                       rival: selectedRival,
                       anchor: _selectedAnchor!,
                       viewportSize: size,
+                      onEdit: widget.onEdit,
+                      onDelete: widget.onDelete,
                       onClose: () {
                         setState(() {
                           _selectedId = null;
                           _selectedAnchor = null;
                         });
                       },
-                    )
-                        .animate()
-                        .fadeIn(duration: 180.ms)
-                        .scale(
+                    ).animate().fadeIn(duration: 180.ms).scale(
                           begin: const Offset(0.98, 0.98),
                           end: const Offset(1, 1),
                           duration: 220.ms,
@@ -620,13 +627,15 @@ class _ConnectionsPainter extends CustomPainter {
         final p2 = _floatPos(basePositions[b]!, b, phase);
 
         final isConnectedToSelected = selectedId != null &&
-            (a == selectedId || b == selectedId ||
+            (a == selectedId ||
+                b == selectedId ||
                 (idToNode[selectedId!]?.connections.contains(a) ?? false) ||
                 (idToNode[selectedId!]?.connections.contains(b) ?? false));
 
         final baseOpacity =
-          selectedId == null ? 0.26 : (isConnectedToSelected ? 0.62 : 0.10);
-        final stroke = selectedId == null ? 1.35 : (isConnectedToSelected ? 1.9 : 1.1);
+            selectedId == null ? 0.26 : (isConnectedToSelected ? 0.62 : 0.10);
+        final stroke =
+            selectedId == null ? 1.35 : (isConnectedToSelected ? 1.9 : 1.1);
 
         final color = (isConnectedToSelected
                 ? AppColors.neonBlue
@@ -665,12 +674,16 @@ class _ExpandedRivalCardOverlay extends StatelessWidget {
   final Rival rival;
   final Offset anchor;
   final Size viewportSize;
+  final void Function(Rival rival)? onEdit;
+  final void Function(Rival rival)? onDelete;
   final VoidCallback onClose;
 
   const _ExpandedRivalCardOverlay({
     required this.rival,
     required this.anchor,
     required this.viewportSize,
+    this.onEdit,
+    this.onDelete,
     required this.onClose,
   });
 
@@ -734,10 +747,45 @@ class _ExpandedRivalCardOverlay extends StatelessWidget {
                         label: category.label,
                         color: accent,
                       ),
+                      if (onEdit != null) ...[
+                        const SizedBox(width: 4),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(
+                            Icons.edit_outlined,
+                            size: 18,
+                            color: AppColors.neonBlue,
+                          ),
+                          onPressed: () {
+                            onClose();
+                            onEdit?.call(rival);
+                          },
+                          tooltip: 'Edit',
+                        ),
+                      ],
+                      if (onDelete != null) ...[
+                        const SizedBox(width: 2),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: AppColors.bloodRed,
+                          ),
+                          onPressed: () {
+                            onClose();
+                            onDelete?.call(rival);
+                          },
+                          tooltip: 'Delete',
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 10),
-
                   _KeyValueRow(label: 'FIELD', value: rival.domain),
                   if (rival.lastAchievement.trim().isNotEmpty) ...[
                     const SizedBox(height: 8),
@@ -773,7 +821,6 @@ class _ExpandedRivalCardOverlay extends StatelessWidget {
                     ),
                   ] else
                     const Spacer(),
-
                   const SizedBox(height: 10),
                   Row(
                     children: [

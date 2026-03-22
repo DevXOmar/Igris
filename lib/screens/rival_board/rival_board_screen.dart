@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
+import '../../models/rival.dart';
 import '../../providers/rival_provider.dart';
 import '../../widgets/layout/igris_screen_scaffold.dart';
 import 'add_rival_bottom_sheet.dart';
@@ -52,7 +53,11 @@ class RivalBoardScreen extends ConsumerWidget {
                 DesignSystem.spacing12,
                 DesignSystem.spacing12 + 72, // clear FAB
               ),
-              child: RivalNetworkView(rivals: state.rivals),
+              child: RivalNetworkView(
+                rivals: state.rivals,
+                onEdit: (rival) => _openEdit(context, rival),
+                onDelete: (rival) => _confirmDelete(context, ref, rival),
+              ),
             ),
     );
   }
@@ -96,6 +101,51 @@ class RivalBoardScreen extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => const AddRivalBottomSheet(),
+    );
+  }
+
+  void _openEdit(BuildContext context, Rival rival) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => AddRivalBottomSheet(existing: rival),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref, Rival rival) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.backgroundSurface,
+        title: const Text(
+          'Remove Rival?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          '${rival.name} will be permanently removed from your board.',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              await ref.read(rivalProvider.notifier).deleteRival(rival.id);
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: AppColors.bloodRed),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
