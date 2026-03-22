@@ -669,6 +669,7 @@ class DomainsScreen extends ConsumerWidget {
                     domainId: domain.id,
                     title: titleController.text.trim(),
                     isRecurring: isRecurring,
+                    createdAt: DateTime.now(),
                   );
                   ref.read(taskProvider.notifier).addTask(task);
                   Navigator.pop(context);

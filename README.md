@@ -218,7 +218,7 @@ IGRIS.
 
 - Igris provides a full JSON backup/export and atomic restore flow (schema v2). Read the full specification and safety guarantees in [BACKUP_SYSTEM.md](BACKUP_SYSTEM.md).
 - Export/restore orchestration is implemented in [lib/services/backup_service.dart](lib/services/backup_service.dart) with schema normalization in [lib/services/backup_migration_service.dart](lib/services/backup_migration_service.dart).
-- From the app UI: open Settings → Data Safety → `Backup Data` / `Restore Backup` (see [lib/screens/settings/settings_screen.dart](lib/screens/settings/settings_screen.dart)).
+- From the app UI: open Settings → Data Safety → `Backup Data` / `Restore Backup` (see [lib/screens/settings/settings_screen.dart](lib/screens/settings/settings_screen.dart)). After a successful export, the app shows the saved location and (when supported by the platform) an `OPEN` action to reveal/open it in the system file UI.
 
 **App Icon Pipeline**
 

@@ -22,9 +22,9 @@ import '../core/theme/igris_animations.dart';
 /// 
 /// Progress Calculation:
 /// - Shows WEEKLY CUMULATIVE progress (not just today)
-/// - Progress = CompletedInstancesThisWeek / TotalScheduledInstancesThisWeek
-/// - Bars gradually fill as tasks are completed throughout the week
-/// - 100% reached only when ALL task instances for ENTIRE week are done
+/// - Progress = CompletedOccurrencesSoFar / ExpectedOccurrencesSoFar
+/// - "Expected" is dynamic (recurring active days + one-time scheduling)
+/// - Bars reflect "weekly progress (so far)" rather than time-based fill
 /// 
 /// Each domain gets a unique color from the theme's color cycle
 class DomainProgressBar extends StatefulWidget {
@@ -85,8 +85,7 @@ class _DomainProgressBarState extends State<DomainProgressBar> {
     final bool hasSubtleGlow = clampedProgress >= 0.9;
     final bool hasStrongGlow = clampedProgress >= 1.0;
     
-    // Debug print - shows weekly cumulative progress
-    print('📊 ${widget.domain.name}: ${(clampedProgress * 100).toStringAsFixed(1)}% (Weekly Cumulative)');
+    // Intentionally no debug printing here; this widget may rebuild frequently.
     
     // Core bar widget with tap scale animation
     Widget barWidget = GestureDetector(

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/domain.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
+import '../services/domain_progress_service.dart';
 import 'domain_provider.dart';
 import 'task_provider.dart';
 import 'daily_log_provider.dart';
@@ -28,12 +29,12 @@ class WeeklyStats {
 /// Formula:
 /// - W_start = Monday 00:00
 /// - W_end = Sunday 23:59
-/// - TotalWeeklyTasks = Count of all task instances for ENTIRE week (all 7 days)
-/// - CompletedWeeklyTasks = Count of completed task instances up to today
-/// - WeeklyScore = (CompletedWeeklyTasks / TotalWeeklyTasks) * 100
+/// - ExpectedSoFar = Count of task instances expected from Monday..today
+/// - CompletedSoFar = Count of completed task instances from Monday..today
+/// - WeeklyScore = (CompletedSoFar / ExpectedSoFar) * 100
 /// 
-/// This makes progress cumulative - bars gradually fill as you complete tasks
-/// throughout the week, reaching 100% only when all tasks are done all 7 days
+/// This makes progress *workload fair* - bars reflect "weekly progress (so far)"
+/// instead of assuming evenly distributed daily work.
 final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
   final domainState = ref.watch(domainProvider);
   final taskState = ref.watch(taskProvider);
@@ -42,7 +43,11 @@ final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
   final logNotifier = ref.watch(dailyLogProvider.notifier);
   
   final today = app_date_utils.DateUtils.today;
-  final startOfWeek = app_date_utils.DateUtils.getStartOfWeek(today);
+  final progressService = DomainProgressService(
+    tasks: taskState.tasks,
+    getLogForDate: logNotifier.getLogForDate,
+    now: today,
+  );
   
   // Calculate weekly progress for each domain
   final weeklyProgress = <Domain, double>{};
@@ -57,47 +62,25 @@ final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
       weeklyProgress[domain] = 0.0;
       continue;
     }
-    
-    // Count TOTAL task instances for ENTIRE WEEK (all 7 days)
-    // This is the denominator - it doesn't change as the week progresses
-    final domainTotalForWeek = domainTasks.length * 7;
-    int domainCompletedThisWeek = 0;
-    
-    // Count completed tasks from Monday through today
-    for (int i = 0; i < 7; i++) {
-      final date = startOfWeek.add(Duration(days: i));
-      
-      // Count all tasks for the full week (for total)
-      // But only count completions up to today
-      if (date.isAfter(today)) {
-        // Don't count completions for future days, but still need to count
-        // these tasks toward total
-        continue;
-      }
-      
-      // Get log for this date
-      final log = logNotifier.getLogForDate(date);
-      
-      // Count completions for this day
-      for (final task in domainTasks) {
-        if (log != null && log.isTaskCompleted(task.id)) {
-          domainCompletedThisWeek++;
-          completedTasksThisWeek++;
-        }
-      }
+
+    // Count expected/completed occurrences *so far* (Mon..today).
+    var domainExpectedSoFar = 0;
+    var domainCompletedSoFar = 0;
+    for (final task in domainTasks) {
+      domainExpectedSoFar += progressService.getExpectedOccurrences(task, today);
+      domainCompletedSoFar += progressService.getCompletedOccurrences(task, today);
     }
-    
-    // Add this domain's total to overall total
-    totalTasksThisWeek += domainTotalForWeek;
-    
-    // Calculate progress as percentage against FULL WEEK
-    final progress = domainTotalForWeek > 0 
-        ? domainCompletedThisWeek / domainTotalForWeek 
+
+    totalTasksThisWeek += domainExpectedSoFar;
+    completedTasksThisWeek += domainCompletedSoFar;
+
+    final progress = domainExpectedSoFar > 0
+        ? (domainCompletedSoFar / domainExpectedSoFar).clamp(0.0, 1.0)
         : 0.0;
     weeklyProgress[domain] = progress;
   }
   
-  // Calculate weekly score against FULL WEEK total
+  // Calculate weekly score against expected-so-far total
   final weeklyScore = totalTasksThisWeek > 0 
       ? (completedTasksThisWeek / totalTasksThisWeek) * 100 
       : 0.0;

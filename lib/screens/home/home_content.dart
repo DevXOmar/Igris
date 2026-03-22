@@ -1033,7 +1033,7 @@ class WeeklyProgressCard extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Bars fill as you complete tasks across all 7 days',
+              'Weekly progress (so far)',
               style: TextStyle(
                 color: AppColors.textMuted.withValues(alpha: 0.9),
                 fontSize: 12,

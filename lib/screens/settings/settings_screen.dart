@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
@@ -25,6 +26,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isRestoring = false;
   String _appVersion = '';
 
+  bool _looksLikeOpenablePathOrUri(String value) {
+    final v = value.trim();
+    if (v.isEmpty) return false;
+    if (v.startsWith('/')) return true; // file path on unix-like
+    final uri = Uri.tryParse(v);
+    return uri != null && uri.scheme.isNotEmpty;
+  }
+
+  Future<void> _openSavedBackup(String savedTo) async {
+    final v = savedTo.trim();
+    if (v.isEmpty) return;
+    final result = await OpenFilex.open(v);
+    if (!mounted) return;
+    if (result.type != ResultType.done) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to open backup location: ${result.message}'),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -48,9 +72,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final path = await _backupService.exportBackup();
       if (!mounted) return;
+      final canOpen = _looksLikeOpenablePathOrUri(path);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Backup saved to:\n$path'),
+          action: canOpen
+              ? SnackBarAction(
+                  label: 'OPEN',
+                  onPressed: () => _openSavedBackup(path),
+                )
+              : null,
           duration: const Duration(seconds: 5),
         ),
       );

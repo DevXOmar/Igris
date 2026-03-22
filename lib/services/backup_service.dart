@@ -15,6 +15,7 @@ import '../models/player_profile.dart';
 import '../models/rival.dart';
 import '../models/task.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
+import 'domain_progress_service.dart';
 
 /// Current schema version.  Increment this when the backup JSON structure
 /// changes and add a matching migration branch inside [runMigration].
@@ -144,8 +145,16 @@ class BackupService {
         app_date_utils.DateUtils.getDateKey(l.date): l,
     };
 
-    final activeDomainIds = domains.where((d) => d.isActive).map((d) => d.id).toSet();
-    final activeTasks = tasks.where((t) => activeDomainIds.contains(t.domainId)).toList();
+    final activeDomainIds =
+      domains.where((d) => d.isActive).map((d) => d.id).toSet();
+    final activeTasks =
+      tasks.where((t) => activeDomainIds.contains(t.domainId)).toList();
+
+    final progressService = DomainProgressService(
+      tasks: activeTasks,
+      getLogForDate: (date) => logsByKey[app_date_utils.DateUtils.getDateKey(date)],
+      now: today,
+    );
 
     int totalTasksThisWeek = 0;
     int completedTasksThisWeek = 0;
@@ -162,31 +171,26 @@ class BackupService {
     // Per-domain snapshot: { domainId: progress0to1 }
     final progressByDomain = <String, double>{};
     for (final domain in domains.where((d) => d.isActive)) {
-      final domainTasks = tasks.where((t) => t.domainId == domain.id).toList();
+      final domainTasks =
+          activeTasks.where((t) => t.domainId == domain.id).toList();
       if (domainTasks.isEmpty) {
         progressByDomain[domain.id] = 0.0;
         continue;
       }
 
-      final domainTotalForWeek = domainTasks.length * 7;
-      totalTasksThisWeek += domainTotalForWeek;
-
-      var domainCompletedThisWeek = 0;
-      for (var i = 0; i < 7; i++) {
-        final date = startOfWeek.add(Duration(days: i));
-        if (date.isAfter(today)) continue;
-        final key = app_date_utils.DateUtils.getDateKey(date);
-        final log = logsByKey[key];
-        for (final task in domainTasks) {
-          if (log != null && log.isTaskCompleted(task.id)) {
-            domainCompletedThisWeek++;
-            completedTasksThisWeek++;
-          }
-        }
+      var domainExpectedSoFar = 0;
+      var domainCompletedSoFar = 0;
+      for (final task in domainTasks) {
+        domainExpectedSoFar += progressService.getExpectedOccurrences(task, today);
+        domainCompletedSoFar += progressService.getCompletedOccurrences(task, today);
       }
 
-      progressByDomain[domain.id] =
-          domainTotalForWeek > 0 ? domainCompletedThisWeek / domainTotalForWeek : 0.0;
+      totalTasksThisWeek += domainExpectedSoFar;
+      completedTasksThisWeek += domainCompletedSoFar;
+
+      progressByDomain[domain.id] = domainExpectedSoFar > 0
+          ? (domainCompletedSoFar / domainExpectedSoFar).clamp(0.0, 1.0)
+          : 0.0;
     }
 
     final weeklyScore = totalTasksThisWeek > 0
