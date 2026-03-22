@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
-import '../../providers/progression_provider.dart';
-import '../../widgets/layout/igris_screen_scaffold.dart';
+import 'system_boot_screen.dart';
 import '../../widgets/ui/igris_button.dart';
 import '../../widgets/ui/igris_input_field.dart';
 
@@ -18,8 +18,15 @@ class NameOnboardingScreen extends ConsumerStatefulWidget {
 
 class _NameOnboardingScreenState extends ConsumerState<NameOnboardingScreen> {
   final _nameCtrl = TextEditingController();
+  late final Future<PackageInfo> _packageInfo;
   String? _error;
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _packageInfo = PackageInfo.fromPlatform();
+  }
 
   @override
   void dispose() {
@@ -41,7 +48,12 @@ class _NameOnboardingScreenState extends ConsumerState<NameOnboardingScreen> {
     });
 
     try {
-      await ref.read(progressionProvider.notifier).updateName(name);
+      FocusManager.instance.primaryFocus?.unfocus();
+      // Let the button enter loading state before route transition.
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+
+      if (!mounted) return;
+      await Navigator.of(context).push(_bootRoute(identityName: name));
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -49,55 +61,167 @@ class _NameOnboardingScreenState extends ConsumerState<NameOnboardingScreen> {
     }
   }
 
+  Route<void> _bootRoute({required String identityName}) {
+    return PageRouteBuilder<void>(
+      opaque: true,
+      transitionDuration: const Duration(milliseconds: 220),
+      reverseTransitionDuration: const Duration(milliseconds: 160),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return SystemBootScreen(identityName: identityName);
+      },
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final fade = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+        return FadeTransition(opacity: fade, child: child);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      child: IgrisScreenScaffold(
-        title: 'Welcome',
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundPrimary,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              DesignSystem.spacing16,
+              DesignSystem.spacing12,
+              DesignSystem.spacing16,
+              DesignSystem.spacing16,
+            ),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  "What's your name?",
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
+                // Top header row (SYSTEM_INIT | BUILD_...)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.terminal,
+                        size: 18,
+                        color: AppColors.neonBlue.withValues(alpha: 0.9),
                       ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: DesignSystem.spacing8),
-                Text(
-                  'This will be shown on your profile.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
+                      const SizedBox(width: DesignSystem.spacing8),
+                      Text(
+                        'SYSTEM_INIT',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: AppColors.neonBlue.withValues(alpha: 0.9),
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 2.0,
+                            ),
                       ),
-                  textAlign: TextAlign.center,
+                      const Spacer(),
+                      FutureBuilder<PackageInfo>(
+                        future: _packageInfo,
+                        builder: (context, snap) {
+                          final info = snap.data;
+                          final build = info?.buildNumber.trim() ?? '';
+                          final version = info?.version.trim() ?? '';
+                          final label = (version.isEmpty)
+                              ? 'BUILD_—'
+                              : (build.isEmpty)
+                                  ? 'BUILD_v$version'
+                                  : 'BUILD_v$version.$build';
+                          return Text(
+                            label,
+                            style:
+                                Theme.of(context).textTheme.labelLarge?.copyWith(
+                                      color:
+                                          AppColors.textSecondary.withValues(alpha: 0.7),
+                                      letterSpacing: 1.4,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-                SizedBox(height: DesignSystem.spacing24),
-                IgrisInputField(
-                  label: 'Name *',
-                  hint: 'Enter your name',
-                  controller: _nameCtrl,
-                  errorText: _error,
-                  autofocus: true,
-                  prefixIcon: Icons.person_outline,
-                  onChanged: (_) {
-                    if (_error != null) setState(() => _error = null);
-                  },
+
+                const SizedBox(height: DesignSystem.spacing24),
+
+                Expanded(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'IDENTIFICATION_REQUIRED',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                  color: AppColors.neonBlue.withValues(alpha: 0.75),
+                                  letterSpacing: 2.6,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                          const SizedBox(height: DesignSystem.spacing24),
+                          Text(
+                            'IDENTIFY\nYOURSELF',
+                            style: Theme.of(context)
+                                .textTheme
+                                .displaySmall
+                                ?.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                  height: 0.95,
+                                  letterSpacing: 1.8,
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: DesignSystem.spacing12),
+                          Center(
+                            child: Container(
+                              height: 4,
+                              width: 84,
+                              decoration: BoxDecoration(
+                                color: AppColors.neonBlue.withValues(alpha: 0.75),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: DesignSystem.spacing24),
+                          IgrisInputField(
+                            label: null,
+                            hint: 'ENTER DESIGNATION...',
+                            controller: _nameCtrl,
+                            errorText: _error,
+                            autofocus: true,
+                            prefixIcon: Icons.person_outline,
+                            onChanged: (_) {
+                              if (_error != null) setState(() => _error = null);
+                            },
+                          ),
+                          const SizedBox(height: DesignSystem.spacing12),
+                          Text(
+                            'AWAITING INPUT FOR SYSTEM\nSYNCHRONIZATION',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  color:
+                                      AppColors.textSecondary.withValues(alpha: 0.55),
+                                  letterSpacing: 1.6,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-                SizedBox(height: DesignSystem.spacing16),
-                IgrisButton(
-                  text: 'Continue',
-                  variant: IgrisButtonVariant.primary,
-                  icon: Icons.arrow_forward,
-                  fullWidth: true,
-                  isLoading: _saving,
-                  onPressed: _saving ? null : _continue,
+
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: IgrisButton(
+                    text: 'INITIALIZE',
+                    variant: IgrisButtonVariant.primary,
+                    icon: Icons.arrow_forward,
+                    fullWidth: true,
+                    isLoading: _saving,
+                    onPressed: _saving ? null : _continue,
+                  ),
                 ),
               ],
             ),

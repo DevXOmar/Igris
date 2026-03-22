@@ -65,9 +65,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
 
     // First launch: name is empty, so onboarding should be shown.
-    expect(find.text('Welcome'), findsOneWidget);
-    expect(find.text("What's your name?"), findsOneWidget);
-    expect(find.text('Continue'), findsOneWidget);
+    expect(find.text('SYSTEM_INIT'), findsOneWidget);
+    expect(find.text('IDENTIFICATION_REQUIRED'), findsOneWidget);
+    expect(find.text('IDENTIFY\nYOURSELF'), findsOneWidget);
+    expect(find.text('INITIALIZE'), findsOneWidget);
 
     final container = ProviderScope.containerOf(tester.element(find.byType(IgrisApp)));
     await container.read(progressionProvider.notifier).updateName('Test User');
@@ -79,6 +80,31 @@ void main() {
     }
 
     // Main app should now be visible.
+    expect(find.byType(HomeScreen), findsOneWidget);
+  });
+
+  testWidgets('Initialize shows boot screen then loads HomeScreen',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const ProviderScope(child: IgrisApp()));
+    await tester.pump(const Duration(milliseconds: 1));
+
+    expect(find.text('SYSTEM_INIT'), findsOneWidget);
+    expect(find.text('IDENTIFY\nYOURSELF'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).first, 'Test User');
+    await tester.tap(find.widgetWithText(IgrisButton, 'INITIALIZE'));
+
+    // Route transition into boot screen.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 380));
+
+    expect(find.text('SYSTEM_AWAKENING'), findsOneWidget);
+    expect(find.text('Initializing system...'), findsOneWidget);
+
+    // Advance through boot duration + fade-out.
+    await tester.pump(const Duration(milliseconds: 2600));
+    await tester.pump(const Duration(milliseconds: 500));
+
     expect(find.byType(HomeScreen), findsOneWidget);
   });
 }
