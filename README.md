@@ -202,16 +202,20 @@ IGRIS.
 - **Tests:** run `flutter test` (this repo's unit tests currently pass).
 - **Run:** `flutter run -d <device>` (choose an emulator, desktop target, or web).
 
-## Recent Changes (v1.1.1)
+## Recent Changes (work since v1.1.1)
 
-- Version bumped to **1.1.1+1** — this release contains several UX and system improvements.
-- Onboarding: first-launch now shows a cinematic name entry flow. The app asks for your name on first run and then shows a short, immersive `System Awakening` boot animation while the app warms providers and binds identity (smooth transition; avoids UI flicker).
-- Cinematic Boot: added `SystemBootScreen` — a centered aura ring with staggered system messages that runs while initialization occurs in parallel.
-- Settings: the About → Version row now reads the runtime app version (no hardcoded value).
-- Backup & Restore: backup/restore system upgraded to schema v2 with migration, preview/confirm UI and atomic restore/rollback semantics.
-- Stats & Progression: refactored stats to allocation-only storage + pure derived calculation; streak milestones and XP rebalance updates included.
-- Rivals: network overlay now supports edit/delete actions and detail views respect the latest state.
-
+- Versioning & Release: runtime app version read from platform metadata instead of a hardcoded value.
+- Onboarding & Cinematic Boot: added a cinematic first-launch name flow and `SystemBootScreen` (prewarm + one-frame delay to avoid flicker and smooth transitions).
+- Backup & Restore (Schema v2): complete overhaul — export/import as portable JSON, migration paths, preview/confirm UX, atomic restore with rollback, and Fuel Vault images embedded as base64 so restores are device-portable.
+- Backup export UX: exports now save to user-visible storage (Downloads/save dialog) and Settings shows the saved location with an `OPEN` action to reveal the file in the system file UI when available.
+- Domain progress & Stats refactor: switched to allocation-only storage and pure derived stats via `DomainProgressService` (expected-so-far vs completed-so-far weekly progress) — fixes weekly progress semantics and improves testability.
+- Tasks & Scheduling: `Task` model extended with scheduling metadata (`activeDays`, `createdAt`, `scheduledFor`) to support recurring and one-off schedules.
+- XP & Streaks: XP rebalance, streak milestones, and title unlocks added; persisted and migrated across schema changes.
+- Rivals UX: network overlay edit/delete restored; detail views use latest rival state.
+- Backup reliability: fallback test-mode file write to app documents to keep tests deterministic; cross-platform save helpers for web/IO supported.
+- App icon pipeline & repo hygiene: source icon handling + launcher icon tooling; refined .gitignore to keep critical lockfiles and ignore generated intermediates.
+- Transition polish: navigation delayed by one frame, prewarm for boot screen, and lightweight first frame rendering to reduce visual jank on startup.
+- Misc: many analyzer-friendly small fixes and refactors; new unit tests for `DomainProgressService` and backup migrations.
 
 
 **Backup & Restore**
