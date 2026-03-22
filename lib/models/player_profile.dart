@@ -22,6 +22,20 @@ class PlayerProfile {
     'discipline': defaultStatValue,
   };
 
+  /// Allocation map (spent stat points) — stored separately from final stats.
+  ///
+  /// Final display stats are derived from:
+  /// - base stats = [defaultStats]
+  /// - allocations = [statAllocations]
+  static const Map<String, int> defaultStatAllocations = {
+    'presence': 0,
+    'strength': 0,
+    'agility': 0,
+    'endurance': 0,
+    'intelligence': 0,
+    'discipline': 0,
+  };
+
   /// Current hunter level (starts at 1).
   @HiveField(0)
   final int level;
@@ -91,6 +105,12 @@ class PlayerProfile {
   @HiveField(14)
   final Map<String, int> stats;
 
+  /// Stat allocations (spent points). Keys are stable strings (e.g. 'presence').
+  ///
+  /// This is the new source of truth for the allocation UI.
+  @HiveField(16)
+  final Map<String, int> statAllocations;
+
   const PlayerProfile({
     this.level = 1,
     this.currentXP = 0,
@@ -108,6 +128,7 @@ class PlayerProfile {
     this.unspentStatPoints = 0,
     this.statPointsAwarded = 0,
     this.stats = defaultStats,
+    this.statAllocations = defaultStatAllocations,
   });
 
   Map<String, dynamic> toJson() => {
@@ -127,6 +148,7 @@ class PlayerProfile {
         'unspentStatPoints': unspentStatPoints,
         'statPointsAwarded': statPointsAwarded,
         'stats': stats,
+        'statAllocations': statAllocations,
       };
 
   factory PlayerProfile.fromJson(Map<String, dynamic> json) {
@@ -144,6 +166,13 @@ class PlayerProfile {
             (k, v) => MapEntry(k.toString(), (v as num).toInt()),
           )
         : Map<String, int>.from(PlayerProfile.defaultStats);
+
+    final allocJson = json['statAllocations'];
+    final allocations = (allocJson is Map)
+        ? allocJson.map(
+            (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+          )
+        : Map<String, int>.from(PlayerProfile.defaultStatAllocations);
 
     return PlayerProfile(
       level: (json['level'] as num?)?.toInt() ?? 1,
@@ -172,6 +201,10 @@ class PlayerProfile {
         ...PlayerProfile.defaultStats,
         ...stats,
       },
+      statAllocations: {
+        ...PlayerProfile.defaultStatAllocations,
+        ...allocations,
+      },
     );
   }
 
@@ -192,6 +225,7 @@ class PlayerProfile {
     int? unspentStatPoints,
     int? statPointsAwarded,
     Map<String, int>? stats,
+    Map<String, int>? statAllocations,
   }) {
     return PlayerProfile(
       level: level ?? this.level,
@@ -211,6 +245,7 @@ class PlayerProfile {
       unspentStatPoints: unspentStatPoints ?? this.unspentStatPoints,
       statPointsAwarded: statPointsAwarded ?? this.statPointsAwarded,
       stats: stats ?? this.stats,
+      statAllocations: statAllocations ?? this.statAllocations,
     );
   }
 }

@@ -22,6 +22,15 @@ class DemoSeedService {
     return true;
   }
 
+  static bool _allocationsAreDefault(Map<String, int> allocations) {
+    final defaults = PlayerProfile.defaultStatAllocations;
+    if (allocations.length != defaults.length) return false;
+    for (final e in defaults.entries) {
+      if (allocations[e.key] != e.value) return false;
+    }
+    return true;
+  }
+
   static bool _looksLikeUserProfile(PlayerProfile profile) {
     if (profile.name.trim().isNotEmpty) return true;
     if (profile.level != 1) return true;
@@ -39,6 +48,7 @@ class DemoSeedService {
     if (profile.unspentStatPoints != 0) return true;
     if (profile.statPointsAwarded != 0) return true;
     if (!_statsAreDefault(profile.stats)) return true;
+    if (!_allocationsAreDefault(profile.statAllocations)) return true;
     return false;
   }
 

@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart' show Icons, IconData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/progression/stat_calculator.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
 import '../models/feat.dart';
 import '../models/domain.dart';
@@ -690,9 +691,6 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
   static const int _xpPerStatPoint = 250;
   static const int _maxStatValue = PlayerProfile.defaultMaxStatValue;
 
-  // Domain → stat contribution: base stat growth per task completion.
-  static const double _taskStatGainUnits = 1.0;
-
   static const double _maxAdditiveXpBonus = 0.50;
 
   final ProgressionService _service = ProgressionService();
@@ -714,16 +712,44 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     final sanitizedUnlocked =
         profile.unlockedTitleIds.where(knownIds.contains).toList(growable: false);
 
-    if (sanitizedEquipped.length == profile.equippedTitleIds.length &&
-        sanitizedEquipped.length == profile.activeTitleIds.length &&
-        sanitizedUnlocked.length == profile.unlockedTitleIds.length) {
-      return profile;
+    var next = profile;
+
+    // ── Migration: legacy final stats -> allocation-only model ───────────
+    final hasAnyAllocations = next.statAllocations.values.any((v) => v != 0);
+    final legacyLooksNonDefault = next.stats.entries.any((e) {
+      final base = PlayerProfile.defaultStats[e.key];
+      return base != null && e.value != base;
+    });
+
+    if (!hasAnyAllocations && legacyLooksNonDefault) {
+      final migratedAllocations = <String, int>{
+        for (final k in PlayerProfile.defaultStatAllocations.keys)
+          k: max(
+            0,
+            (next.stats[k] ?? PlayerProfile.defaultStatValue) -
+                PlayerProfile.defaultStatValue,
+          ),
+      };
+      next = next.copyWith(
+        stats: PlayerProfile.defaultStats,
+        statAllocations: migratedAllocations,
+      );
+      Future(() async {
+        await _service.saveProfile(next);
+      });
     }
-    return profile.copyWith(
-      equippedTitleIds: sanitizedEquipped,
-      activeTitleIds: sanitizedEquipped,
-      unlockedTitleIds: sanitizedUnlocked,
-    );
+
+    if (sanitizedEquipped.length != next.equippedTitleIds.length ||
+        sanitizedEquipped.length != next.activeTitleIds.length ||
+        sanitizedUnlocked.length != next.unlockedTitleIds.length) {
+      next = next.copyWith(
+        equippedTitleIds: sanitizedEquipped,
+        activeTitleIds: sanitizedEquipped,
+        unlockedTitleIds: sanitizedUnlocked,
+      );
+    }
+
+    return next;
   }
 
   List<String> _sanitizeEquippedTitleIds(
@@ -881,128 +907,6 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     return out;
   }
 
-  int _fnv1a32(String input) {
-    const int fnvPrime = 0x01000193;
-    int hash = 0x811c9dc5;
-    for (final c in input.codeUnits) {
-      hash ^= c;
-      hash = (hash * fnvPrime) & 0xFFFFFFFF;
-    }
-    return hash & 0xFFFFFFFF;
-  }
-
-  double _stableUnitDouble(String seed) {
-    // Map a stable 32-bit hash onto [0, 1).
-    final h = _fnv1a32(seed);
-    return h / 4294967296.0;
-  }
-
-  Map<String, double> _normalizedDomainWeights(Domain domain) {
-    final filtered = <String, double>{};
-    for (final e in domain.statWeights.entries) {
-      final k = e.key;
-      final v = e.value;
-      if (!PlayerProfile.defaultStats.containsKey(k)) continue;
-      if (v <= 0) continue;
-      filtered[k] = v;
-    }
-
-    if (filtered.isEmpty) {
-      return const {
-        'discipline': 0.5,
-        'intelligence': 0.5,
-      };
-    }
-
-    final sum = filtered.values.fold<double>(0.0, (a, b) => a + b);
-    if (sum <= 0.0) {
-      return const {
-        'discipline': 0.5,
-        'intelligence': 0.5,
-      };
-    }
-
-    return {
-      for (final e in filtered.entries) e.key: e.value / sum,
-    };
-  }
-
-  Map<String, int> _computeTaskStatGains({
-    required PlayerProfile profile,
-    required Domain domain,
-    required String taskId,
-    required DateTime date,
-    required bool weeklyBalanceMet,
-  }) {
-    if (_taskStatGainUnits <= 0.0) return const {};
-
-    final weights = _normalizedDomainWeights(domain);
-    final allBonus = _allStatsBonusPercentForGains(
-      profile,
-      weeklyBalanceMet: weeklyBalanceMet,
-    );
-    final byKeyBonus = _statBonusPercentByKeyForGains(profile);
-
-    final gains = <String, int>{};
-    var total = 0;
-    for (final e in weights.entries) {
-      final key = e.key;
-      final weight = e.value;
-      final base = _taskStatGainUnits * weight;
-      final bonus = allBonus + (byKeyBonus[key] ?? 0.0);
-      final adjusted = base * (1.0 + max(0.0, bonus));
-
-      final whole = adjusted.floor();
-      final frac = adjusted - whole;
-      var inc = whole;
-      if (frac > 0.0) {
-        final seed = '${domain.id}|$taskId|${date.toIso8601String()}|$key';
-        if (_stableUnitDouble(seed) < frac) inc += 1;
-      }
-      if (inc <= 0) continue;
-      gains[key] = (gains[key] ?? 0) + inc;
-      total += inc;
-    }
-
-    if (total > 0) return gains;
-
-    // Guarantee at least one stat point when weights exist.
-    String? bestKey;
-    var bestScore = -1.0;
-    for (final e in weights.entries) {
-      final key = e.key;
-      final weight = e.value;
-      final bonus = allBonus + (byKeyBonus[key] ?? 0.0);
-      final score = weight * (1.0 + max(0.0, bonus));
-      if (score > bestScore) {
-        bestScore = score;
-        bestKey = key;
-      }
-    }
-    if (bestKey == null) return const {};
-    return {bestKey: 1};
-  }
-
-  Map<String, int> _applyStatGains(
-    Map<String, int> current,
-    Map<String, int> gains,
-  ) {
-    if (gains.isEmpty) return current;
-    final next = <String, int>{
-      ...PlayerProfile.defaultStats,
-      ...current,
-    };
-    for (final e in gains.entries) {
-      final key = e.key;
-      final inc = e.value;
-      if (!next.containsKey(key)) continue;
-      final base = next[key] ?? PlayerProfile.defaultStatValue;
-      final updated = (base + inc).clamp(0, _maxStatValue);
-      next[key] = updated;
-    }
-    return next;
-  }
-
   // ── Formula: requiredXP = baseXP * level^1.5 ────────────────────────────
 
   /// XP required to advance FROM [level] to [level]+1.
@@ -1024,23 +928,10 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     if (todayLog?.graceUsed == true) return;
 
     final domain = ref.read(domainProvider).getDomainById(domainId);
-    final weeklyBalanceMet = _isWeeklyBalanceMet(
-      weeklyStats: ref.read(weeklyStatsProvider),
-      domainState: ref.read(domainProvider),
-    );
-    final gains = domain == null
-        ? const <String, int>{}
-        : _computeTaskStatGains(
-            profile: state,
-            domain: domain,
-            taskId: taskId,
-            date: today,
-            weeklyBalanceMet: weeklyBalanceMet,
-          );
 
+    // Stats must never change from task completion.
     var profile = state.copyWith(
       totalTasksCompleted: state.totalTasksCompleted + 1,
-      stats: _applyStatGains(state.stats, gains),
     );
     await _service.saveProfile(profile);
     state = profile;
@@ -1146,28 +1037,38 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     state = profile;
   }
 
-  /// Persists a new stat map and updates unspent points.
+  /// Persists a new allocation map and updates unspent points.
   ///
-  /// This is the only write path for stat allocation UI.
+  /// Backward-compatible name: [stats] now represents ALLOCATIONS (spent
+  /// points), not final derived stats.
+  ///
+  /// This is the only write path for the stat allocation UI.
   Future<void> updateStats({
     required Map<String, int> stats,
     required int unspentStatPoints,
   }) async {
-    final normalizedStats = <String, int>{
-      ...PlayerProfile.defaultStats,
+    final normalizedAllocations = <String, int>{
+      ...PlayerProfile.defaultStatAllocations,
       ...stats,
     };
 
-    // Clamp values to prevent invalid persistence.
-    normalizedStats.updateAll((_, v) {
+    final maxAllocation = _maxStatValue - PlayerProfile.defaultStatValue;
+    normalizedAllocations.updateAll((_, v) {
       if (v < 0) return 0;
-      if (v > _maxStatValue) return _maxStatValue;
+      if (v > maxAllocation) return maxAllocation;
       return v;
     });
 
+    // Harden: compute unspent from the current total earned, ignoring any
+    // mismatched UI-provided value.
+    final currentSpent = state.statAllocations.values.fold<int>(0, (a, b) => a + b);
+    final totalEarned = state.unspentStatPoints + currentSpent;
+    final newSpent = normalizedAllocations.values.fold<int>(0, (a, b) => a + b);
+    final computedUnspent = max(0, totalEarned - newSpent);
+
     final profile = state.copyWith(
-      stats: normalizedStats,
-      unspentStatPoints: unspentStatPoints < 0 ? 0 : unspentStatPoints,
+      statAllocations: normalizedAllocations,
+      unspentStatPoints: computedUnspent,
     );
     await _service.saveProfile(profile);
     state = profile;
@@ -1344,9 +1245,9 @@ final effectiveStatsProvider = Provider<Map<String, int>>((ref) {
   final weeklyStats = ref.watch(weeklyStatsProvider);
   final domains = ref.watch(domainProvider);
 
-  final base = <String, int>{
-    ...PlayerProfile.defaultStats,
-    ...profile.stats,
+  final allocations = <String, int>{
+    ...PlayerProfile.defaultStatAllocations,
+    ...profile.statAllocations,
   };
 
   final bonusByKey = <String, double>{
@@ -1384,14 +1285,10 @@ final effectiveStatsProvider = Provider<Map<String, int>>((ref) {
     }
   }
 
-  const maxStat = PlayerProfile.defaultMaxStatValue;
-  final out = <String, int>{};
-  base.forEach((k, v) {
-    final bonus = bonusByKey[k] ?? 0.0;
-    final effective = (v * (1.0 + max(0.0, bonus))).round();
-    out[k] = effective.clamp(0, maxStat);
-  });
-  return out;
+  return calculateStats(
+    allocations: allocations,
+    allocationBonusByKey: bonusByKey,
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

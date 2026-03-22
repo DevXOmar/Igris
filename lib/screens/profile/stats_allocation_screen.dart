@@ -16,12 +16,13 @@ class StatsAllocationScreen extends ConsumerStatefulWidget {
 }
 
 class _StatsAllocationScreenState extends ConsumerState<StatsAllocationScreen> {
-  late Map<String, int> _stats;
+  late Map<String, int> _allocations;
   late int _unspent;
 
   bool _initialized = false;
 
   static const int _maxValue = 99;
+  static const int _baseValue = 1;
 
   @override
   void didChangeDependencies() {
@@ -29,11 +30,13 @@ class _StatsAllocationScreenState extends ConsumerState<StatsAllocationScreen> {
     if (_initialized) return;
 
     final profile = ref.read(progressionProvider);
-    _stats = {
-      ...profile.stats,
+
+    final maxAllocation = _maxValue - _baseValue;
+    _allocations = {
+      ...profile.statAllocations,
     };
     for (final k in kHunterStatKeys) {
-      _stats[k] = (_stats[k] ?? 0).clamp(0, _maxValue);
+      _allocations[k] = (_allocations[k] ?? 0).clamp(0, maxAllocation);
     }
 
     _unspent = profile.unspentStatPoints;
@@ -43,6 +46,11 @@ class _StatsAllocationScreenState extends ConsumerState<StatsAllocationScreen> {
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(progressionProvider);
+
+    final derivedStats = <String, int>{
+      for (final k in kHunterStatKeys)
+        k: (_baseValue + (_allocations[k] ?? 0)).clamp(0, _maxValue),
+    };
 
     // If points changed (earned from XP) while screen is open, keep UI stable.
     // The user can re-open to refresh.
@@ -89,7 +97,7 @@ class _StatsAllocationScreenState extends ConsumerState<StatsAllocationScreen> {
                 child: Row(
                   children: [
                     HunterRadarChart(
-                      stats: _stats,
+                      stats: derivedStats,
                       size: 140,
                       maxValue: _maxValue,
                     ),
@@ -142,9 +150,11 @@ class _StatsAllocationScreenState extends ConsumerState<StatsAllocationScreen> {
                       const SizedBox(height: DesignSystem.spacing12),
                   itemBuilder: (context, index) {
                     final key = kHunterStatKeys[index];
-                    final value = (_stats[key] ?? 0).clamp(0, _maxValue);
-                    final canInc = _unspent > 0 && value < _maxValue;
-                    final canDec = value > 0;
+                    final maxAllocation = _maxValue - _baseValue;
+                    final allocation = (_allocations[key] ?? 0).clamp(0, maxAllocation);
+                    final value = (_baseValue + allocation).clamp(0, _maxValue);
+                    final canInc = _unspent > 0 && allocation < maxAllocation;
+                    final canDec = allocation > 0;
 
                     return Container(
                       padding: const EdgeInsets.symmetric(
@@ -187,7 +197,7 @@ class _StatsAllocationScreenState extends ConsumerState<StatsAllocationScreen> {
                             onTap: () {
                               if (!canDec) return;
                               setState(() {
-                                _stats[key] = (value - 1).clamp(0, _maxValue);
+                                _allocations[key] = (allocation - 1).clamp(0, maxAllocation);
                                 _unspent += 1;
                               });
                             },
@@ -199,7 +209,7 @@ class _StatsAllocationScreenState extends ConsumerState<StatsAllocationScreen> {
                             onTap: () {
                               if (!canInc) return;
                               setState(() {
-                                _stats[key] = (value + 1).clamp(0, _maxValue);
+                                _allocations[key] = (allocation + 1).clamp(0, maxAllocation);
                                 _unspent -= 1;
                               });
                             },
@@ -226,7 +236,7 @@ class _StatsAllocationScreenState extends ConsumerState<StatsAllocationScreen> {
                   ),
                   onPressed: () async {
                     await ref.read(progressionProvider.notifier).updateStats(
-                          stats: _stats,
+                          stats: _allocations,
                           unspentStatPoints: _unspent,
                         );
                     if (!context.mounted) return;
