@@ -62,6 +62,13 @@ class Task extends HiveObject {
 
   /// Scheduled date if present, otherwise createdAt.
   DateTime? get scheduledForOrCreatedAt => scheduledFor ?? createdAt;
+
+  /// Scheduled date for one-time (non-recurring) tasks.
+  ///
+  /// This is the date the task is intended to appear on the Home screen.
+  ///
+  /// Backward-compatible: stored as [scheduledFor] in Hive.
+  DateTime? get scheduledDate => scheduledForOrCreatedAt;
   
   /// Create a copy of this task with modified fields
   Task copyWith({

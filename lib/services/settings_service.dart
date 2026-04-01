@@ -8,6 +8,7 @@ class SettingsService {
   static const String _boxName = 'settingsBox';
   static const String _lastResetKey = 'lastWeeklyReset';
   static const String _graceTokensKey = 'remainingGraceTokens';
+  static const String _weeklyGoalRewardWeekKey = 'weeklyGoalRewardWeekStart';
   static const int _maxGraceTokens = 2;
   
   /// Get the settings box
@@ -18,6 +19,22 @@ class SettingsService {
     final timestamp = _box.get(_lastResetKey) as String?;
     if (timestamp == null) return null;
     return DateTime.parse(timestamp);
+  }
+
+  /// Returns the week start (Monday) for which the weekly goal reward was last
+  /// awarded.
+  DateTime? getLastWeeklyGoalRewardWeekStart() {
+    final timestamp = _box.get(_weeklyGoalRewardWeekKey) as String?;
+    if (timestamp == null) return null;
+    return DateTime.parse(timestamp);
+  }
+
+  /// Marks the weekly goal reward as awarded for the given [weekStart].
+  ///
+  /// Persisting this prevents duplicate weekly rewards if the UI triggers the
+  /// completion handler multiple times.
+  Future<void> setLastWeeklyGoalRewardWeekStart(DateTime weekStart) async {
+    await _box.put(_weeklyGoalRewardWeekKey, weekStart.toIso8601String());
   }
   
   /// Set last weekly reset date

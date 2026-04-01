@@ -12,7 +12,6 @@ import '../../models/task.dart';
 import '../../providers/grace_provider.dart';
 import '../../providers/daily_log_provider.dart';
 import '../../providers/progression_provider.dart';
-import '../../providers/domain_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/weekly_stats_provider.dart';
 import '../fuel_vault/vault_auth_screen.dart';
@@ -33,6 +32,22 @@ class HomeContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    const weeklyGoalThreshold = 99.999;
+
+    // Bridge weekly progress -> progression rewards.
+    // `ref.listen` must be registered inside build for ConsumerWidget.
+    // Awarding is still guarded to once-per-week inside ProgressionNotifier.
+    ref.listen<double>(
+      weeklyStatsProvider.select((s) => s.weeklyScore),
+      (prev, next) {
+        final prevHit = (prev ?? 0.0) >= weeklyGoalThreshold;
+        final nextHit = next >= weeklyGoalThreshold;
+        if (!prevHit && nextHit) {
+          ref.read(progressionProvider.notifier).onWeeklyGoalCompleted();
+        }
+      },
+    );
+
     final today = app_date_utils.DateUtils.today;
     final todayFormatted = app_date_utils.DateUtils.formatDateLong(today);
 
@@ -50,16 +65,12 @@ class HomeContent extends ConsumerWidget {
 
     final graceState = ref.watch(graceProvider);
     final logState = ref.watch(dailyLogProvider);
-    final domainState = ref.watch(domainProvider);
-    final taskState = ref.watch(taskProvider);
+    final todayTasks = ref.watch(todayTasksProvider);
 
     final todayLog = logState.todayLog;
     final graceAlreadyUsedToday = todayLog?.graceUsed ?? false;
 
-    final activeTodayTasks = taskState.tasks.where((task) {
-      final domain = domainState.getDomainById(task.domainId);
-      return domain != null && domain.isActive;
-    }).toList(growable: false);
+    final activeTodayTasks = todayTasks;
 
     final completedActiveTasks = (todayLog == null)
       ? 0
@@ -69,15 +80,17 @@ class HomeContent extends ConsumerWidget {
       ? 1.0
       : (completedActiveTasks / activeTodayTasks.length);
 
-    final lowProgressDetected =
-      activeTodayTasks.isNotEmpty && completionRatio < 0.70;
+    final zeroProgressDetected =
+      activeTodayTasks.isNotEmpty && completedActiveTasks == 0;
 
     final canOfferGracePrompt = after9pm &&
-      lowProgressDetected &&
+      zeroProgressDetected &&
       !graceAlreadyUsedToday &&
       graceState.weeklyGraceLeft > 0;
 
+    final todayDomainIds = todayTasks.map((t) => t.domainId).toSet();
     final domainProgressItems = weeklyStats.weeklyProgress.entries
+        .where((e) => todayDomainIds.contains(e.key.id))
         .map(
           (e) => _WeeklyProgressItem(
             domainId: e.key.id,
@@ -119,6 +132,25 @@ class HomeContent extends ConsumerWidget {
                 ),
               ),
             ),
+            if (graceAlreadyUsedToday)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    DesignSystem.spacing16,
+                    DesignSystem.spacing8,
+                    DesignSystem.spacing16,
+                    0,
+                  ),
+                  child: Text(
+                    'Grace Active — Uncompleted tasks will not break your streak today',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
             if (canOfferGracePrompt)
               SliverToBoxAdapter(
                 child: Padding(
@@ -144,7 +176,7 @@ class HomeContent extends ConsumerWidget {
                             ),
                           ),
                           content: Text(
-                            'Low progress detected.\n\nGrace Token will preserve your streak, but you will gain no XP.',
+                            'No tasks completed today.\n\nGrace Token will preserve your streak. XP from any completed tasks will still count.',
                             style: TextStyle(
                               color: AppColors.textPrimary,
                               height: 1.35,
@@ -514,7 +546,7 @@ class _EndOfDayGracePromptCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Today: ${completionPercent.toStringAsFixed(0)}% complete. Apply Grace to preserve streak (no XP).',
+                    'Today: ${completionPercent.toStringAsFixed(0)}% complete. Apply Grace to preserve streak. Completed tasks still grant XP.',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
@@ -1232,10 +1264,11 @@ class _DomainTasksSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final taskState = ref.watch(taskProvider);
+    final todayTasks = ref.watch(todayTasksProvider);
     final logState = ref.watch(dailyLogProvider);
 
-    final domainTasks = taskState.tasks.where((t) => t.domainId == domainId).toList();
+    final domainTasks =
+        todayTasks.where((t) => t.domainId == domainId).toList();
     domainTasks.sort((a, b) {
       if (a.isRecurring && !b.isRecurring) return -1;
       if (!a.isRecurring && b.isRecurring) return 1;

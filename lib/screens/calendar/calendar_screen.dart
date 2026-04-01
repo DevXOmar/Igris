@@ -279,7 +279,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                             ),
                             SizedBox(width: DesignSystem.spacing8),
                             Text(
-                              'Grace used (no XP)',
+                              'Grace Active',
                               style: TextStyle(
                                 color: AppColors.royalGold,
                                 fontSize: 14,

@@ -2,8 +2,36 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/task.dart';
 import '../models/domain.dart';
 import '../services/task_service.dart';
+import '../core/utils/date_utils.dart' as app_date_utils;
+import '../services/daily_log_service.dart';
 import 'domain_provider.dart';
 import 'daily_log_provider.dart';
+
+int _weekdayIndex(DateTime date) => date.weekday - 1; // Mon=0 .. Sun=6
+
+/// True when [task] should be visible/interactive on the given [date].
+///
+/// Rules:
+/// - Recurring tasks: show if active on that weekday.
+/// - One-time tasks: show only on their scheduled/created date.
+bool isTaskActiveOnDate(Task task, DateTime date) {
+  if (task.isRecurring) {
+    final createdAt = task.createdAt;
+    if (createdAt != null) {
+      final createdDay = DateTime(createdAt.year, createdAt.month, createdAt.day);
+      final checkDay = DateTime(date.year, date.month, date.day);
+      if (checkDay.isBefore(createdDay)) return false;
+    }
+    return task.effectiveActiveDays.contains(_weekdayIndex(date));
+  }
+
+  final scheduled = task.scheduledDate;
+  if (scheduled == null) {
+    // Legacy safety: if we cannot determine a scheduled day, keep it visible.
+    return true;
+  }
+  return app_date_utils.DateUtils.isSameDay(scheduled, date);
+}
 
 /// State class for Task management
 /// Holds all tasks and provides filtering methods
@@ -51,12 +79,55 @@ class TaskState {
 /// Handles all task-related operations and persists to Hive
 class TaskNotifier extends Notifier<TaskState> {
   final TaskService _service = TaskService();
+  final DailyLogService _dailyLogService = DailyLogService();
   
   @override
   TaskState build() {
     // Initialize state by loading tasks from Hive
     final tasks = _service.getAllTasks();
+
+    // Backward-compat: older saves may have one-time tasks with no createdAt.
+    // Infer a stable date so today-only filtering works without deleting data.
+    // ignore: discarded_futures
+    Future.microtask(() => _backfillLegacyOneTimeTaskDates(tasks));
+
     return TaskState(tasks: tasks);
+  }
+
+  Future<void> _backfillLegacyOneTimeTaskDates(List<Task> snapshot) async {
+    final missing = snapshot
+        .where((t) => !t.isRecurring && t.scheduledDate == null)
+        .toList(growable: false);
+    if (missing.isEmpty) return;
+
+    final missingIds = missing.map((t) => t.id).toSet();
+    final logs = _dailyLogService.getAllLogs();
+
+    final earliest = <String, DateTime>{};
+    for (final log in logs) {
+      for (final id in log.completedTaskIds) {
+        if (!missingIds.contains(id)) continue;
+        final prev = earliest[id];
+        if (prev == null || log.date.isBefore(prev)) {
+          earliest[id] = log.date;
+        }
+      }
+    }
+
+    final today = app_date_utils.DateUtils.today;
+    var didUpdate = false;
+    for (final t in missing) {
+      final inferred = earliest[t.id] ?? today;
+      final normalized = DateTime(inferred.year, inferred.month, inferred.day);
+
+      // Prefer storing as createdAt (Hive field 5) to keep schema stable.
+      await _service.updateTask(t.copyWith(createdAt: normalized));
+      didUpdate = true;
+    }
+
+    if (didUpdate) {
+      loadTasks();
+    }
   }
   
   /// Reload tasks from storage
@@ -105,6 +176,7 @@ final taskProvider = NotifierProvider<TaskNotifier, TaskState>(() {
 final todayTasksProvider = Provider<List<Task>>((ref) {
   final taskState = ref.watch(taskProvider);
   final domainState = ref.watch(domainProvider);
+  final today = app_date_utils.DateUtils.today;
   
   // Get all active domain IDs for filtering
   final activeDomainIds = domainState.activeDomains.map((d) => d.id).toSet();
@@ -114,7 +186,8 @@ final todayTasksProvider = Provider<List<Task>>((ref) {
   // 2. For V1, all tasks appear (one-time tasks would have date logic in V2)
   // 3. Exclude tasks from inactive domains
   final todayTasks = taskState.tasks.where((task) {
-    return activeDomainIds.contains(task.domainId);
+    if (!activeDomainIds.contains(task.domainId)) return false;
+    return isTaskActiveOnDate(task, today);
   }).toList();
   
   // Sort: recurring first, then by title
@@ -144,19 +217,21 @@ final todayProgressProvider = Provider<Map<Domain, double>>((ref) {
   final domainState = ref.watch(domainProvider);
   final taskState = ref.watch(taskProvider);
   final logState = ref.watch(dailyLogProvider);
+
+  final today = app_date_utils.DateUtils.today;
   
   final progressMap = <Domain, double>{};
   
   // Calculate progress for each active domain
   for (final domain in domainState.activeDomains) {
     // Get all tasks for this domain that should appear today
-    final domainTasks = taskState.tasks.where((task) => 
-      task.domainId == domain.id
-    ).toList();
+    final domainTasks = taskState.tasks.where((task) {
+      if (task.domainId != domain.id) return false;
+      return isTaskActiveOnDate(task, today);
+    }).toList();
     
-    // If no tasks, progress is 0
+    // If no tasks for today, omit this domain on the Home screen.
     if (domainTasks.isEmpty) {
-      progressMap[domain] = 0.0;
       continue;
     }
     

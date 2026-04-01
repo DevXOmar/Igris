@@ -101,7 +101,13 @@ class DemoSeedService {
       Task(id: 't_ac_1', domainId: 'd_academics', title: 'Read 10 pages', isRecurring: true),
       Task(id: 't_ac_2', domainId: 'd_academics', title: 'Solve 20 problems', isRecurring: true),
       Task(id: 't_ac_3', domainId: 'd_academics', title: 'Revise flashcards', isRecurring: true),
-      Task(id: 't_ac_4', domainId: 'd_academics', title: 'Mock test (30m)', isRecurring: false),
+      Task(
+        id: 't_ac_4',
+        domainId: 'd_academics',
+        title: 'Mock test (30m)',
+        isRecurring: false,
+        createdAt: now,
+      ),
 
       // Boxing
       Task(id: 't_bx_1', domainId: 'd_boxing', title: 'Footwork drills', isRecurring: true),
@@ -113,13 +119,25 @@ class DemoSeedService {
       Task(id: 't_ds_1', domainId: 'd_ds', title: 'LeetCode (1 problem)', isRecurring: true),
       Task(id: 't_ds_2', domainId: 'd_ds', title: 'System design notes', isRecurring: true),
       Task(id: 't_ds_3', domainId: 'd_ds', title: 'Project commit', isRecurring: true),
-      Task(id: 't_ds_4', domainId: 'd_ds', title: 'Review fundamentals', isRecurring: false),
+      Task(
+        id: 't_ds_4',
+        domainId: 'd_ds',
+        title: 'Review fundamentals',
+        isRecurring: false,
+        createdAt: now,
+      ),
 
       // Stocks
       Task(id: 't_st_1', domainId: 'd_stocks', title: 'Market scan (10m)', isRecurring: true),
       Task(id: 't_st_2', domainId: 'd_stocks', title: 'Read 1 annual report section', isRecurring: true),
       Task(id: 't_st_3', domainId: 'd_stocks', title: 'Update watchlist', isRecurring: true),
-      Task(id: 't_st_4', domainId: 'd_stocks', title: 'Journal 1 trade idea', isRecurring: false),
+      Task(
+        id: 't_st_4',
+        domainId: 'd_stocks',
+        title: 'Journal 1 trade idea',
+        isRecurring: false,
+        createdAt: now,
+      ),
 
       // Vachan
       Task(id: 't_va_1', domainId: 'd_vachan', title: 'Meditation (10m)', isRecurring: true),

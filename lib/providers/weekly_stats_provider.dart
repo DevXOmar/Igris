@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/domain.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
 import '../services/domain_progress_service.dart';
+import '../services/streak_calculator.dart';
 import 'domain_provider.dart';
 import 'task_provider.dart';
 import 'daily_log_provider.dart';
@@ -86,7 +87,15 @@ final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
       : 0.0;
   
   // Calculate current streak
-  final streak = _calculateStreak(ref, today, taskState, logNotifier);
+  final streak = calculateCurrentStreak(
+    today: today,
+    tasks: taskState.tasks,
+    isDomainActive: (domainId) {
+      final domain = domainState.getDomainById(domainId);
+      return domain != null && domain.isActive;
+    },
+    getLogForDate: logNotifier.getLogForDate,
+  );
   
   return WeeklyStats(
     weeklyProgress: weeklyProgress,
@@ -96,65 +105,3 @@ final weeklyStatsProvider = Provider<WeeklyStats>((ref) {
     completedTasksThisWeek: completedTasksThisWeek,
   );
 });
-
-/// Calculate current streak
-/// A day counts toward streak if:
-/// - Daily completion >= 70% OR
-/// - Grace was used
-int _calculateStreak(
-  Ref ref,
-  DateTime today,
-  TaskState taskState,
-  DailyLogNotifier logNotifier,
-) {
-  int streak = 0;
-  DateTime checkDate = today;
-  
-  final domainState = ref.watch(domainProvider);
-
-  // If there are no active tasks at all, streak is defined as 0.
-  final activeTasks = taskState.tasks.where((task) {
-    final domain = domainState.getDomainById(task.domainId);
-    return domain != null && domain.isActive;
-  }).toList(growable: false);
-
-  if (activeTasks.isEmpty) return 0;
-
-  // Safety net: prevent unbounded lookback (e.g., malformed data).
-  const int maxLookbackDays = 3660; // ~10 years
-  var lookedBack = 0;
-  
-  // Go backwards from today, counting consecutive days that meet criteria
-  while (true) {
-    if (lookedBack++ >= maxLookbackDays) break;
-    // Currently, tasks are treated as scheduled daily for active domains.
-    // If scheduling is added later, replace this with per-date logic.
-    final allTodayTasks = activeTasks;
-
-    final log = logNotifier.getLogForDate(checkDate);
-
-    // Check if grace was used this day.
-    if (log?.graceUsed == true) {
-      streak++;
-      checkDate = checkDate.subtract(const Duration(days: 1));
-      continue;
-    }
-    
-    final completedCount = allTodayTasks.where((task) => 
-      log?.isTaskCompleted(task.id) ?? false
-    ).length;
-    
-    final completionPercentage = (completedCount / allTodayTasks.length) * 100;
-    
-    // Check if completion is >= 70%
-    if (completionPercentage >= 70.0) {
-      streak++;
-      checkDate = checkDate.subtract(const Duration(days: 1));
-    } else {
-      // Streak ends
-      break;
-    }
-  }
-  
-  return streak;
-}

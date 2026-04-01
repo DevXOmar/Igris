@@ -16,6 +16,11 @@ Future<String> saveBackupFile(String jsonContent, String fileName) async {
   return fileName;
 }
 
+Future<void> openBackupLocation(String savedTo) async {
+  // Web has no general "open containing folder" concept.
+  // No-op to keep call sites platform-agnostic.
+}
+
 /// Reads the file content from the in-memory bytes provided by file_picker on web.
 Future<String> readPickedBackupFile(FilePickerResult result) async {
   final bytes = result.files.single.bytes;

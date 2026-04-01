@@ -16,6 +16,7 @@ import '../models/rival.dart';
 import '../models/task.dart';
 import '../core/utils/date_utils.dart' as app_date_utils;
 import 'domain_progress_service.dart';
+import 'streak_calculator.dart';
 
 /// Current schema version.  Increment this when the backup JSON structure
 /// changes and add a matching migration branch inside [runMigration].
@@ -218,39 +219,14 @@ class BackupService {
     required List<Task> activeTasks,
     required Map<String, DailyLog> logsByKey,
   }) {
-    if (activeTasks.isEmpty) return 0;
-
-    var streak = 0;
-    var checkDate = today;
-
-    const int maxLookbackDays = 3660;
-    var lookedBack = 0;
-
-    while (true) {
-      if (lookedBack++ >= maxLookbackDays) break;
-      final key = app_date_utils.DateUtils.getDateKey(checkDate);
-      final log = logsByKey[key];
-
-      if (log?.graceUsed == true) {
-        streak++;
-        checkDate = checkDate.subtract(const Duration(days: 1));
-        continue;
-      }
-
-      final completedCount = activeTasks
-          .where((task) => log?.isTaskCompleted(task.id) ?? false)
-          .length;
-
-      final completionPercentage = (completedCount / activeTasks.length) * 100;
-      if (completionPercentage >= 70.0) {
-        streak++;
-        checkDate = checkDate.subtract(const Duration(days: 1));
-      } else {
-        break;
-      }
-    }
-
-    return streak;
+    return calculateCurrentStreak(
+      today: today,
+      tasks: activeTasks,
+      // Backup only includes tasks from active domains.
+      isDomainActive: (_) => true,
+      getLogForDate: (date) =>
+          logsByKey[app_date_utils.DateUtils.getDateKey(date)],
+    );
   }
 
   // ── Preview ───────────────────────────────────────────────────────────────

@@ -67,13 +67,15 @@ void main() {
 
     await notifier.addXP(XpRewards.taskComplete);
 
-    expect(container.read(progressionProvider).totalXP, 15);
+    // Level 1 early-game multiplier: 1.8x
+    expect(container.read(progressionProvider).totalXP, 27);
 
     await notifier.onDomainCompleted();
-    expect(container.read(progressionProvider).totalXP, 40);
+    expect(container.read(progressionProvider).totalXP, 72);
 
     await notifier.onWeeklyGoalCompleted();
-    expect(container.read(progressionProvider).totalXP, 140);
+    // Weekly completion: 100 + 50 (both affected by early multiplier)
+    expect(container.read(progressionProvider).totalXP, 342);
   });
 
   test('45/60 streak milestones award XP once', () async {

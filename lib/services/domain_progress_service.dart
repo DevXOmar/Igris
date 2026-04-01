@@ -55,11 +55,15 @@ class DomainProgressService {
       final activeDays = task.effectiveActiveDays;
       if (activeDays.isEmpty) return 0;
 
+      final effectiveStart = getEffectiveStartDate(task, startOfWeek);
+      if (effectiveStart.isAfter(today)) return 0;
+
       var count = 0;
-      for (var i = 0; i < 7; i++) {
-        final date = startOfWeek.add(Duration(days: i));
-        if (date.isAfter(today)) break;
-        if (activeDays.contains(i)) count++;
+      for (var date = effectiveStart;
+          !date.isAfter(today);
+          date = date.add(const Duration(days: 1))) {
+        final weekdayIndex = date.weekday - DateTime.monday; // Mon=0..Sun=6
+        if (activeDays.contains(weekdayIndex)) count++;
       }
       return count;
     }
@@ -87,11 +91,15 @@ class DomainProgressService {
       final activeDays = task.effectiveActiveDays;
       if (activeDays.isEmpty) return 0;
 
+      final effectiveStart = getEffectiveStartDate(task, startOfWeek);
+      if (effectiveStart.isAfter(today)) return 0;
+
       var count = 0;
-      for (var i = 0; i < 7; i++) {
-        final date = startOfWeek.add(Duration(days: i));
-        if (date.isAfter(today)) break;
-        if (!activeDays.contains(i)) continue;
+      for (var date = effectiveStart;
+          !date.isAfter(today);
+          date = date.add(const Duration(days: 1))) {
+        final weekdayIndex = date.weekday - DateTime.monday; // Mon=0..Sun=6
+        if (!activeDays.contains(weekdayIndex)) continue;
 
         final log = _getLogForDate(date);
         if (log != null && log.isTaskCompleted(task.id)) {
@@ -127,4 +135,15 @@ class DomainProgressService {
   }
 
   static DateTime _normalizeDate(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// Effective inclusive start date for recurring task expectations.
+  ///
+  /// Recurring tasks should only count occurrences starting from the day they
+  /// were created, but never earlier than [startOfWeek].
+  static DateTime getEffectiveStartDate(Task task, DateTime startOfWeek) {
+    final weekStart = _normalizeDate(startOfWeek);
+    final created = task.createdAt == null ? null : _normalizeDate(task.createdAt!);
+    if (created == null) return weekStart;
+    return created.isAfter(weekStart) ? created : weekStart;
+  }
 }

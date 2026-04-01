@@ -24,13 +24,13 @@ class DomainTasksBottomSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Get tasks for this domain
-    final taskState = ref.watch(taskProvider);
+    // Get tasks for this domain (today-only visibility rules).
+    final todayTasks = ref.watch(todayTasksProvider);
     final logState = ref.watch(dailyLogProvider);
     
-    final domainTasks = taskState.tasks.where((task) => 
-      task.domainId == domain.id
-    ).toList();
+    final domainTasks = todayTasks
+        .where((task) => task.domainId == domain.id)
+        .toList();
     
     // Calculate completion stats
     final completedCount = domainTasks.where((task) =>

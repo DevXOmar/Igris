@@ -4,6 +4,10 @@ Future<String> saveBackupFile(String jsonContent, String fileName) async {
   throw UnsupportedError('Backup is not supported on this platform.');
 }
 
+Future<void> openBackupLocation(String savedTo) async {
+  throw UnsupportedError('Open backup location is not supported on this platform.');
+}
+
 Future<String> readPickedBackupFile(FilePickerResult result) async {
   throw UnsupportedError('Restore is not supported on this platform.');
 }

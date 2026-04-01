@@ -5,6 +5,10 @@ import '../core/utils/date_utils.dart' as app_date_utils;
 /// Service for managing DailyLog data in Hive
 class DailyLogService {
   static const String _boxName = 'dailyLogsBox';
+
+  /// Stored inside [DailyLog.rewardedTaskIds] to ensure the first-task bonus
+  /// is granted at most once per day.
+  static const String firstTaskOfDayBonusRewardKey = '__bonus:firstTaskOfDay__';
   
   /// Get the daily logs box
   Box<DailyLog> get _box => Hive.box<DailyLog>(_boxName);
@@ -66,6 +70,22 @@ class DailyLogService {
 
     final updated = log.copyWith(
       rewardedTaskIds: [...log.rewardedTaskIds, taskId],
+    );
+    await saveLog(updated);
+    return true;
+  }
+
+  /// Marks the "first task of the day" bonus as awarded for [date].
+  ///
+  /// Returns true if this call newly awards it; false if it was already
+  /// awarded earlier today.
+  Future<bool> markFirstTaskOfDayBonusAwarded(DateTime date) async {
+    final log = getOrCreateLogForDate(date);
+    final already = log.hasGrantedRewardForTask(firstTaskOfDayBonusRewardKey);
+    if (already) return false;
+
+    final updated = log.copyWith(
+      rewardedTaskIds: [...log.rewardedTaskIds, firstTaskOfDayBonusRewardKey],
     );
     await saveLog(updated);
     return true;

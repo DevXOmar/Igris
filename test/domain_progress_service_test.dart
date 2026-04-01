@@ -214,5 +214,65 @@ void main() {
       expect(progressUndone, closeTo(1 / 3, 0.0001));
       expect(progressUndone, lessThan(progressDone));
     });
+
+    test('Recurring task expected occurrences start from createdAt', () {
+      // Week of 2026-03-16 is Monday.
+      final now = _d(2026, 3, 20); // Friday
+      final start = app_date_utils.DateUtils.getStartOfWeek(now);
+
+      final domain = Domain(id: 'd1', name: 'Health');
+      final createdAt = start.add(const Duration(days: 2)); // Wednesday
+      final task = Task(
+        id: 't1',
+        domainId: domain.id,
+        title: 'Run',
+        isRecurring: true,
+        // Daily recurring
+        activeDays: const [0, 1, 2, 3, 4, 5, 6],
+        createdAt: createdAt,
+      );
+
+      final logs = <String, DailyLog>{
+        // Completed only on Wednesday.
+        app_date_utils.DateUtils.getDateKey(createdAt): _log(createdAt, ['t1']),
+      };
+
+      final svc = DomainProgressService(
+        tasks: [task],
+        getLogForDate: (date) => logs[app_date_utils.DateUtils.getDateKey(date)],
+        now: now,
+      );
+
+      // Expected so far should be Wed..Fri = 3, not Mon..Fri = 5.
+      expect(svc.getExpectedOccurrences(task, now), 3);
+      expect(svc.getCompletedOccurrences(task, now), 1);
+      expect(svc.calculateDomainProgress(domain), closeTo(1 / 3, 0.0001));
+    });
+
+    test('Recurring task created after today has 0 expected/completed', () {
+      final now = _d(2026, 3, 18); // Wednesday
+      final start = app_date_utils.DateUtils.getStartOfWeek(now);
+      final domain = Domain(id: 'd1', name: 'Work');
+
+      final createdAt = start.add(const Duration(days: 4)); // Friday
+      final task = Task(
+        id: 't1',
+        domainId: domain.id,
+        title: 'Deep work',
+        isRecurring: true,
+        activeDays: const [0, 1, 2, 3, 4, 5, 6],
+        createdAt: createdAt,
+      );
+
+      final svc = DomainProgressService(
+        tasks: [task],
+        getLogForDate: (_) => null,
+        now: now,
+      );
+
+      expect(svc.getExpectedOccurrences(task, now), 0);
+      expect(svc.getCompletedOccurrences(task, now), 0);
+      expect(svc.calculateDomainProgress(domain), 0.0);
+    });
   });
 }

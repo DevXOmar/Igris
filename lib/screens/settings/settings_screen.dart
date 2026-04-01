@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
@@ -10,6 +9,7 @@ import '../../providers/task_provider.dart';
 import '../../widgets/ui/igris_ui.dart';
 import '../../widgets/layout/igris_screen_scaffold.dart';
 import '../../services/backup_service.dart';
+import '../../services/backup_platform.dart';
 
 /// Settings screen for app configuration and grace token management
 /// Refactored with Igris UI components for consistent styling
@@ -37,12 +37,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _openSavedBackup(String savedTo) async {
     final v = savedTo.trim();
     if (v.isEmpty) return;
-    final result = await OpenFilex.open(v);
-    if (!mounted) return;
-    if (result.type != ResultType.done) {
+    try {
+      await openBackupLocation(v);
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Unable to open backup location: ${result.message}'),
+          content: Text('Unable to open backup location: $e'),
           duration: const Duration(seconds: 4),
         ),
       );

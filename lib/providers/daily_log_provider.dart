@@ -71,7 +71,6 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
   Future<void> toggleTaskCompletion(String taskId, String domainId) async {
     final today = state.today;
     final wasCompleted = state.isTaskCompletedToday(taskId);
-    final graceUsed = state.todayLog?.graceUsed ?? false;
     
     // Toggle completion in daily log
     await _service.toggleTaskCompletion(today, taskId);
@@ -84,7 +83,7 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
       // Task was not completed, now completing -> increase strength
       await ref.read(domainProvider.notifier).incrementDomainStrength(domainId);
       final shouldReward = await _service.markTaskRewarded(today, taskId);
-      if (!graceUsed && shouldReward) {
+      if (shouldReward) {
         await ref
             .read(progressionProvider.notifier)
             .recordTaskCompleted(taskId: taskId, domainId: domainId);
@@ -100,9 +99,8 @@ class DailyLogNotifier extends Notifier<DailyLogState> {
     if (!state.isTaskCompletedToday(taskId)) {
       await _service.completeTask(state.today, taskId);
       await ref.read(domainProvider.notifier).incrementDomainStrength(domainId);
-      final graceUsed = state.todayLog?.graceUsed ?? false;
       final shouldReward = await _service.markTaskRewarded(state.today, taskId);
-      if (!graceUsed && shouldReward) {
+      if (shouldReward) {
         await ref
             .read(progressionProvider.notifier)
             .recordTaskCompleted(taskId: taskId, domainId: domainId);

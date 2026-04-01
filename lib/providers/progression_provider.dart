@@ -14,6 +14,7 @@ import '../providers/weekly_stats_provider.dart';
 import '../services/daily_log_service.dart';
 import '../services/progression_service.dart';
 import '../services/animation_service.dart';
+import '../services/settings_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TITLE DEFINITIONS
@@ -303,21 +304,21 @@ class TitleUnlockContext {
     if (log.graceUsed) return true;
 
     // Match the streak criteria in weekly_stats_provider:
-    // completion >= 70% across active-domain tasks.
-    final allTasks = taskState.tasks.where((task) {
+    // Any completion across *eligible* active-domain tasks qualifies.
+    final eligibleTasks = taskState.tasks.where((task) {
       final domain = domainState.getDomainById(task.domainId);
-      return domain != null && domain.isActive;
+      if (domain == null || !domain.isActive) return false;
+      return isTaskActiveOnDate(task, date);
     }).toList(growable: false);
 
-    if (allTasks.isEmpty) {
+    if (eligibleTasks.isEmpty) {
       // No tasks that day — don't break the streak.
       return true;
     }
 
     final completedCount =
-        allTasks.where((task) => log.isTaskCompleted(task.id)).length;
-    final completionPercentage = (completedCount / allTasks.length) * 100;
-    return completionPercentage >= 70.0;
+      eligibleTasks.where((task) => log.isTaskCompleted(task.id)).length;
+    return completedCount >= 1;
   }
 
   int _graceUsedInWeek(DateTime weekStart) {
@@ -436,7 +437,7 @@ class TitleDefinitions {
         TitleEffect.streakXpBonus(0.10),
         TitleEffect.xpBonus(0.05),
         TitleEffect.note(
-            'Grace preserves your streak but grants no XP for that day.'),
+            'Grace preserves your streak; XP from completed tasks still counts.'),
       ],
       checkCondition: (c) => c.hasUnyieldingRythmForThreeWeeks,
     ),
@@ -661,14 +662,28 @@ class XpRewards {
   XpRewards._();
 
   static const int taskComplete = 15;
+  static const int firstTaskOfDayBonus = 20;
   static const int domainComplete = 25;
   static const int weeklyGoal = 100;
+  static const int weeklyPerfectBonus = 50;
   static const int streak7 = 50;
   static const int streak14 = 100;
   static const int streak21 = 150;
   static const int streak30 = 200;
   static const int streak45 = 300;
   static const int streak60 = 400;
+}
+
+int getAllocationPointsForLevel(int level) {
+  if (level <= 5) return 4;
+  if (level <= 15) return 3;
+  return 2;
+}
+
+double getEarlyGameXpMultiplier(int level) {
+  if (level <= 5) return 1.8;
+  if (level <= 10) return 1.3;
+  return 1.0;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -711,13 +726,13 @@ int _rankIndex(String rank) {
 /// - [addXP]               — direct XP injection (public for flexibility)
 class ProgressionNotifier extends Notifier<PlayerProfile> {
   static const int _baseXP = 100;
-  static const int _xpPerStatPoint = 250;
   static const int _maxStatValue = PlayerProfile.defaultMaxStatValue;
 
   static const double _maxAdditiveXpBonus = 0.50;
 
   final ProgressionService _service = ProgressionService();
   final DailyLogService _dailyLogService = DailyLogService();
+  final SettingsService _settingsService = SettingsService();
 
   @override
   PlayerProfile build() {
@@ -912,43 +927,6 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     return max(0.0, bonus);
   }
 
-  double _allStatsBonusPercentForGains(
-    PlayerProfile profile, {
-    required bool weeklyBalanceMet,
-  }) {
-    double bonus = 0.0;
-    for (final id in profile.equippedTitleIds) {
-      if (id == 'rulers_authority' && weeklyBalanceMet) {
-        bonus += 0.10;
-        continue;
-      }
-      final def = TitleDefinitions.findById(id);
-      if (def == null) continue;
-      for (final e in def.effects) {
-        if (e.type == TitleEffectType.allStatsBonus) bonus += e.percent;
-      }
-    }
-    return max(0.0, bonus);
-  }
-
-  Map<String, double> _statBonusPercentByKeyForGains(PlayerProfile profile) {
-    final out = <String, double>{
-      for (final k in PlayerProfile.defaultStats.keys) k: 0.0,
-    };
-    for (final id in profile.equippedTitleIds) {
-      final def = TitleDefinitions.findById(id);
-      if (def == null) continue;
-      for (final e in def.effects) {
-        if (e.type != TitleEffectType.statBonus) continue;
-        final key = e.statKey;
-        if (key == null) continue;
-        if (!out.containsKey(key)) continue;
-        out[key] = (out[key] ?? 0.0) + e.percent;
-      }
-    }
-    return out;
-  }
-
   // ── Formula: requiredXP = baseXP * level^1.5 ────────────────────────────
 
   /// XP required to advance FROM [level] to [level]+1.
@@ -965,8 +943,6 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     required String domainId,
   }) async {
     final today = app_date_utils.DateUtils.today;
-    final todayLog = _dailyLogService.getLogForDate(today);
-    if (todayLog?.graceUsed == true) return;
 
     final domain = ref.read(domainProvider).getDomainById(domainId);
 
@@ -989,7 +965,15 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
         ? 0.0
         : _taskBonusPercent(profile: state, task: task, domain: domain);
     final adjustedBase = (base * (1.0 + bonus)).round();
-    await addXP(adjustedBase);
+
+    // Daily engagement: first completed task of the day grants a flat XP bonus
+    // once per day.
+    final isFirstTaskOfDay =
+      await _dailyLogService.markFirstTaskOfDayBonusAwarded(today);
+    final finalBase =
+      adjustedBase + (isFirstTaskOfDay ? XpRewards.firstTaskOfDayBonus : 0);
+
+    await addXP(finalBase);
   }
 
   /// Syncs the current streak into [PlayerProfile.longestStreak] and
@@ -1014,25 +998,47 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
 
   /// Award 75 XP for completing the weekly campaign (score = 100%).
   Future<void> onWeeklyGoalCompleted() async {
+    final today = app_date_utils.DateUtils.today;
+    final weekStart = app_date_utils.DateUtils.getStartOfWeek(today);
+    final lastWeek = _settingsService.getLastWeeklyGoalRewardWeekStart();
+    if (lastWeek != null) {
+      final lastWeekStart = app_date_utils.DateUtils.getStartOfWeek(DateTime(
+        lastWeek.year,
+        lastWeek.month,
+        lastWeek.day,
+      ));
+      if (!weekStart.isAfter(lastWeekStart)) {
+        // Already rewarded for this week.
+        return;
+      }
+    }
+
+    await _settingsService.setLastWeeklyGoalRewardWeekStart(weekStart);
+
     var profile = state;
     profile = profile.copyWith(
         weeklyGoalsCompleted: profile.weeklyGoalsCompleted + 1);
     await _service.saveProfile(profile);
     state = profile;
+
+    // Weekly completion: base reward + perfect week bonus.
     await addXP(_applyWeeklyGoalXpEffects(XpRewards.weeklyGoal));
+    await addXP(_applyWeeklyGoalXpEffects(XpRewards.weeklyPerfectBonus));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(animationServiceProvider.notifier).onWeeklyCompletion();
+    });
   }
 
   /// Adds [baseAmount] XP (after applying equipped title effects),
   /// then runs the full check pipeline:
   /// level-up → rank promotion → title unlocks.
   Future<void> addXP(int baseAmount, {bool isStreakAward = false}) async {
-    // If grace is used today, the day is treated as "skipped" for rewards.
-    // Streak is preserved via graceUsed, but XP is blocked.
-    final today = app_date_utils.DateUtils.today;
-    final todayLog = _dailyLogService.getLogForDate(today);
-    if (todayLog?.graceUsed == true) return;
-
-    final amount = _applyXpEffects(base: baseAmount, isStreak: isStreakAward);
+    // Early-game pacing: multiply the base XP once based on the current level.
+    final earlyMult = getEarlyGameXpMultiplier(state.level);
+    final scaledBase = (baseAmount * earlyMult).round();
+    final amount =
+        _applyXpEffects(base: scaledBase, isStreak: isStreakAward);
     var profile = state;
     profile = profile.copyWith(
       currentXP: profile.currentXP + amount,
@@ -1042,12 +1048,26 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     // Level-up loop (handles multi-level skips in one call)
     bool didLevelUp = false;
     int latestLevel = profile.level;
+    int allocationPointsEarned = 0;
     while (profile.currentXP >= requiredXPForLevel(profile.level)) {
       final surplus = profile.currentXP - requiredXPForLevel(profile.level);
       final newLevel = profile.level + 1;
+      allocationPointsEarned += getAllocationPointsForLevel(newLevel);
       profile = profile.copyWith(level: newLevel, currentXP: surplus);
       didLevelUp = true;
       latestLevel = newLevel;
+    }
+
+    if (allocationPointsEarned > 0) {
+      final effects = _aggregateEquippedTitleEffects(profile);
+      final adjusted = max(
+        allocationPointsEarned,
+        (allocationPointsEarned * (1.0 + effects.statPointBonusPercent))
+            .floor(),
+      );
+      profile = profile.copyWith(
+        unspentStatPoints: profile.unspentStatPoints + adjusted,
+      );
     }
 
     if (didLevelUp) {
@@ -1070,9 +1090,6 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
 
     // Title unlock check
     profile = _withTitleUnlocks(profile);
-
-    // XP milestone → stat point awards
-    profile = _withStatPointMilestones(profile);
 
     await _service.saveProfile(profile);
     state = profile;
@@ -1275,21 +1292,6 @@ class ProgressionNotifier extends Notifier<PlayerProfile> {
     }
     if (unlocked.length == profile.unlockedTitleIds.length) return profile;
     return profile.copyWith(unlockedTitleIds: unlocked);
-  }
-
-  PlayerProfile _withStatPointMilestones(PlayerProfile profile) {
-    if (_xpPerStatPoint <= 0) return profile;
-    final earned = profile.totalXP ~/ _xpPerStatPoint;
-    final delta = earned - profile.statPointsAwarded;
-    if (delta <= 0) return profile;
-
-    final effects = _aggregateEquippedTitleEffects(profile);
-    final adjustedDelta =
-        max(delta, (delta * (1.0 + effects.statPointBonusPercent)).floor());
-    return profile.copyWith(
-      statPointsAwarded: earned,
-      unspentStatPoints: profile.unspentStatPoints + adjustedDelta,
-    );
   }
 }
 
