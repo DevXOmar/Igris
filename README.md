@@ -247,3 +247,14 @@ IGRIS.
 - The analyzer may report info-level suggestions (prefer_const, etc.); these are not blocking but useful to clean up.
 
 If you'd like, I can add a short CI job to run `flutter analyze` + `flutter test` on every push, and/or add a unit test that validates v1→v2 migration behavior.
+
+## Latest (2026-04-01)
+
+- **Grace token behavior:** grace now preserves streaks but no longer blocks XP from completed tasks; completed tasks still award XP even on grace days.
+- **One-time tasks visibility:** one-time (non-recurring) tasks are visible only on their `scheduledFor` date (or `createdAt` if scheduled date is absent). Historical logs and XP remain unchanged.
+- **Recurring tasks & createdAt:** recurring task expected-occurrence and streak calculations now respect a task's `createdAt` so days before creation are not counted toward expectations. (Partial rollout; see `lib/providers/task_provider.dart`.)
+- **Legacy compatibility/backfill:** on startup the app backfills missing `createdAt` for legacy one-time tasks (infers earliest completion date or defaults to today) to avoid exposing stale tasks from old saves.
+- **Riverpod listener fix:** moved some `ref.listen` usages into `build()` locations to avoid assertion crashes during widget lifecycle.
+- **Backup filename & Open action fixes (planned/partially implemented):** fixed duplicate `.json.json` naming and adjusted platform helpers to save to user-visible storage; post-backup `OPEN` now reveals the containing folder when supported by the platform. Device verification recommended.
+
+If you want this summarized in CHANGELOG.md instead, I can add a small changelog file and keep `README.md` focused on project overview.
