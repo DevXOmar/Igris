@@ -12,6 +12,7 @@ import '../../models/fuel_vault_entry.dart';
 import '../../providers/fuel_vault_provider.dart';
 import '../../widgets/layout/igris_screen_scaffold.dart';
 import 'add_fuel_bottom_sheet.dart';
+import 'edit_fuel_info_bottom_sheet.dart';
 import 'fuel_vault_entry_detail_screen.dart';
 
 class FuelVaultScreen extends ConsumerWidget {
@@ -70,6 +71,14 @@ class FuelVaultScreen extends ConsumerWidget {
                             builder: (_) =>
                                 FuelVaultEntryDetailScreen(entry: entry),
                           ),
+                        );
+                      },
+                      onLongPress: () {
+                        showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => EditFuelInfoBottomSheet(entry: entry),
                         );
                       },
                     );
@@ -133,8 +142,13 @@ class _EmptyFuelVault extends StatelessWidget {
 class _FuelVaultGridTile extends StatelessWidget {
   final FuelVaultEntry entry;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
-  const _FuelVaultGridTile({required this.entry, required this.onTap});
+  const _FuelVaultGridTile({
+    required this.entry,
+    required this.onTap,
+    required this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -142,6 +156,7 @@ class _FuelVaultGridTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: DesignSystem.radiusSmall,
         child: Ink(
           decoration: BoxDecoration(

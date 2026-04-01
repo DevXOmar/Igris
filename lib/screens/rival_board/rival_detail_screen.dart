@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/design_system.dart';
 import '../../models/rival.dart';
 import '../../providers/rival_provider.dart';
+import '../../widgets/security/vault_pin_dialog.dart';
 import '../../widgets/ui/igris_button.dart';
 import '../../widgets/ui/igris_card.dart';
 import 'add_rival_bottom_sheet.dart';
@@ -14,18 +15,117 @@ import 'add_rival_bottom_sheet.dart';
 ///
 /// Shows description, last achievement, last updated, threat level,
 /// and provides Edit / Delete actions.
-class RivalDetailScreen extends ConsumerWidget {
+class RivalDetailScreen extends ConsumerStatefulWidget {
   final Rival rival;
 
   const RivalDetailScreen({super.key, required this.rival});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RivalDetailScreen> createState() => _RivalDetailScreenState();
+}
+
+class _RivalDetailScreenState extends ConsumerState<RivalDetailScreen> {
+  bool _proximalAuthorized = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final rival = widget.rival;
+
     // Keep card in sync if the user edits while on this screen.
     final currentRival = ref.watch(rivalProvider).rivals.firstWhere(
           (r) => r.id == rival.id,
           orElse: () => rival,
         );
+
+    final isProximalLocked =
+        currentRival.category == RivalCategory.proximal && !_proximalAuthorized;
+
+    if (isProximalLocked) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundPrimary,
+        appBar: AppBar(
+          backgroundColor: AppColors.backgroundSurface,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: AppColors.textPrimary),
+          title: const Text(
+            'Rival Board',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.0,
+            ),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(
+              color: AppColors.neonBlue.withValues(alpha: 0.2),
+              height: 1,
+            ),
+          ),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: DesignSystem.paddingAll16,
+            child: IgrisCard(
+              variant: IgrisCardVariant.elevated,
+              padding: DesignSystem.paddingAll16,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.lock_outline, color: AppColors.neonBlue),
+                      SizedBox(width: DesignSystem.spacing8),
+                      Expanded(
+                        child: Text(
+                          'PROXIMAL RIVAL',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: DesignSystem.spacing12),
+                  Text(
+                    'This rival is marked as PROXIMAL and requires your Fuel Vault PIN to view.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                        ),
+                  ),
+                  SizedBox(height: DesignSystem.spacing16),
+                  IgrisButton(
+                    text: 'Enter PIN',
+                    variant: IgrisButtonVariant.outline,
+                    icon: Icons.lock_open_outlined,
+                    fullWidth: true,
+                    onPressed: () async {
+                      final ok = await showVaultPinDialog(
+                        context: context,
+                        ref: ref,
+                        title: 'Unlock Proximal Rival',
+                        subtitle: 'Enter Fuel Vault PIN',
+                        shareSessionUnlock: false,
+                      );
+                      if (!mounted) return;
+                      if (ok) {
+                        setState(() {
+                          _proximalAuthorized = true;
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.backgroundPrimary,

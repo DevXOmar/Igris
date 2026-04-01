@@ -74,6 +74,11 @@ class FuelVaultNotifier extends Notifier<FuelVaultState> {
     _reload();
   }
 
+  Future<void> updateEntry(FuelVaultEntry entry) async {
+    await _service.updateEntry(entry);
+    _reload();
+  }
+
   Future<void> deleteEntry(String id) async {
     await _service.deleteEntry(id);
     _reload();

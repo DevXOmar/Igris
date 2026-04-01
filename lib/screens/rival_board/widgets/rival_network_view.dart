@@ -2,10 +2,12 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/design_system.dart';
 import '../../../models/rival.dart';
+import '../../../widgets/security/vault_pin_dialog.dart';
 import '../../../widgets/ui/igris_card.dart';
 
 /// Lightweight node-based rival network visualization.
@@ -14,7 +16,7 @@ import '../../../widgets/ui/igris_card.dart';
 /// - Edges: CustomPainter lines, brighten when selected
 /// - Interaction: tap node -> expand card near node, dim others
 /// - Tap outside -> collapse
-class RivalNetworkView extends StatefulWidget {
+class RivalNetworkView extends ConsumerStatefulWidget {
   final List<Rival> rivals;
   final void Function(Rival rival)? onEdit;
   final void Function(Rival rival)? onDelete;
@@ -27,10 +29,10 @@ class RivalNetworkView extends StatefulWidget {
   });
 
   @override
-  State<RivalNetworkView> createState() => _RivalNetworkViewState();
+  ConsumerState<RivalNetworkView> createState() => _RivalNetworkViewState();
 }
 
-class _RivalNetworkViewState extends State<RivalNetworkView>
+class _RivalNetworkViewState extends ConsumerState<RivalNetworkView>
     with SingleTickerProviderStateMixin {
   late final AnimationController _t;
 
@@ -164,6 +166,7 @@ class _RivalNetworkViewState extends State<RivalNetworkView>
               // Nodes
               ...nodes.map((node) {
                 final base = positions[node.id]!;
+                final isProximal = node.category == RivalCategory.proximal;
                 return Positioned(
                   left: base.dx,
                   top: base.dy,
@@ -172,7 +175,29 @@ class _RivalNetworkViewState extends State<RivalNetworkView>
                     controller: _t,
                     isSelected: _selectedId == node.id,
                     dimmed: _selectedId != null && _selectedId != node.id,
-                    onTap: () {
+                    // Proximal rival previews must never reveal identity.
+                    hideIdentity: isProximal,
+                    onTap: () async {
+                      if (isProximal) {
+                        final ok = await showVaultPinDialog(
+                          context: context,
+                          ref: ref,
+                          title: 'Unlock Proximal Rival',
+                          subtitle: 'Enter Fuel Vault PIN',
+                          shareSessionUnlock: false,
+                        );
+                        if (!mounted) return;
+                        if (!ok) return;
+
+                        // Only allow viewing proximal rival intel after a
+                        // successful PIN entry (ask every time).
+                        setState(() {
+                          _selectedId = node.id;
+                          _selectedAnchor = base;
+                        });
+                        return;
+                      }
+
                       setState(() {
                         _selectedId = node.id;
                         _selectedAnchor = base;
@@ -491,6 +516,7 @@ class _RivalNode extends StatelessWidget {
   final AnimationController controller;
   final bool isSelected;
   final bool dimmed;
+  final bool hideIdentity;
   final VoidCallback onTap;
 
   const _RivalNode({
@@ -498,6 +524,7 @@ class _RivalNode extends StatelessWidget {
     required this.controller,
     required this.isSelected,
     required this.dimmed,
+    required this.hideIdentity,
     required this.onTap,
   });
 
@@ -532,8 +559,10 @@ class _RivalNode extends StatelessWidget {
                   scale: breathe * selectedScale,
                   child: Semantics(
                     button: true,
-                    label: node.rival.name,
-                    hint: 'Open rival details card',
+                    label: hideIdentity ? 'Proximal rival (locked)' : node.rival.name,
+                    hint: hideIdentity
+                        ? 'Enter Fuel Vault PIN to view'
+                        : 'Open rival details card',
                     child: Container(
                       width: baseSize,
                       height: baseSize,
@@ -670,7 +699,7 @@ class _ConnectionsPainter extends CustomPainter {
   }
 }
 
-class _ExpandedRivalCardOverlay extends StatelessWidget {
+class _ExpandedRivalCardOverlay extends ConsumerWidget {
   final Rival rival;
   final Offset anchor;
   final Size viewportSize;
@@ -688,9 +717,12 @@ class _ExpandedRivalCardOverlay extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final category = rival.category;
     final accent = _categoryAccent(category);
+
+    final displayName = rival.name;
+    final displayDomain = rival.domain;
 
     const cardWidth = 320.0;
     const cardMaxHeight = 220.0;
@@ -734,7 +766,7 @@ class _ExpandedRivalCardOverlay extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          rival.name,
+                          displayName,
                           style:
                               Theme.of(context).textTheme.titleMedium?.copyWith(
                                     color: AppColors.textPrimary,
@@ -786,7 +818,7 @@ class _ExpandedRivalCardOverlay extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  _KeyValueRow(label: 'FIELD', value: rival.domain),
+                  _KeyValueRow(label: 'FIELD', value: displayDomain),
                   if (rival.lastAchievement.trim().isNotEmpty) ...[
                     const SizedBox(height: 8),
                     _KeyValueRow(
@@ -811,11 +843,10 @@ class _ExpandedRivalCardOverlay extends StatelessWidget {
                         physics: const ClampingScrollPhysics(),
                         child: Text(
                           rival.description,
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.textSecondary,
-                                    height: 1.35,
-                                  ),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: AppColors.textSecondary,
+                                height: 1.35,
+                              ),
                         ),
                       ),
                     ),

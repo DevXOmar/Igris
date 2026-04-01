@@ -9,6 +9,7 @@ import '../../core/theme/design_system.dart';
 import '../../core/utils/date_utils.dart' as app_date_utils;
 import '../../models/fuel_vault_entry.dart';
 import '../../providers/fuel_vault_provider.dart';
+import 'edit_fuel_info_bottom_sheet.dart';
 
 class FuelVaultEntryDetailScreen extends ConsumerWidget {
   final FuelVaultEntry entry;
@@ -52,7 +53,15 @@ class FuelVaultEntryDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dateText = app_date_utils.DateUtils.formatDateLong(entry.createdAt);
+    final latestEntry = (() {
+      final entries = ref.watch(fuelVaultProvider).entries;
+      for (final e in entries) {
+        if (e.id == entry.id) return e;
+      }
+      return entry;
+    })();
+
+    final dateText = app_date_utils.DateUtils.formatDateLong(latestEntry.createdAt);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundPrimary,
@@ -62,6 +71,18 @@ class FuelVaultEntryDetailScreen extends ConsumerWidget {
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
         title: const Text('Fuel Vault'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, color: AppColors.textPrimary),
+            onPressed: () {
+              showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => EditFuelInfoBottomSheet(entry: latestEntry),
+              );
+            },
+            tooltip: 'Edit info',
+          ),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
             onPressed: () => _confirmDelete(context, ref),
@@ -82,10 +103,10 @@ class FuelVaultEntryDetailScreen extends ConsumerWidget {
                   maxScale: 4.0,
                   child: Center(
                     child: Hero(
-                      tag: 'fuel-vault-${entry.id}',
+                      tag: 'fuel-vault-${latestEntry.id}',
                       child: kIsWeb
                           ? Image.network(
-                              entry.imagePath,
+                              latestEntry.imagePath,
                               fit: BoxFit.contain,
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.broken_image_outlined,
@@ -94,7 +115,7 @@ class FuelVaultEntryDetailScreen extends ConsumerWidget {
                               ),
                             )
                           : Image.file(
-                              File(entry.imagePath),
+                              File(latestEntry.imagePath),
                               fit: BoxFit.contain,
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.broken_image_outlined,
@@ -124,18 +145,18 @@ class FuelVaultEntryDetailScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (entry.title != null) ...[
+                  if (latestEntry.title != null) ...[
                     Text(
-                      entry.title!,
+                      latestEntry.title!,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                     ),
                     SizedBox(height: DesignSystem.spacing8),
                   ],
-                  if (entry.category != null) ...[
+                  if (latestEntry.category != null) ...[
                     Text(
-                      entry.category!,
+                      latestEntry.category!,
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                             color: AppColors.neonBlue,
                             letterSpacing: 0.6,
@@ -143,9 +164,9 @@ class FuelVaultEntryDetailScreen extends ConsumerWidget {
                     ),
                     SizedBox(height: DesignSystem.spacing8),
                   ],
-                  if (entry.note != null && entry.note!.trim().isNotEmpty) ...[
+                  if (latestEntry.note != null && latestEntry.note!.trim().isNotEmpty) ...[
                     Text(
-                      entry.note!,
+                      latestEntry.note!,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppColors.textSecondary,
                           ),

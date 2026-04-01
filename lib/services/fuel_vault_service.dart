@@ -31,6 +31,13 @@ class FuelVaultService {
     await _box.put(entry.id, entry);
   }
 
+  /// Replaces an existing entry (or inserts if missing) using the same [id].
+  ///
+  /// Use this to edit title/note/category after the entry is created.
+  Future<void> updateEntry(FuelVaultEntry entry) async {
+    await _box.put(entry.id, entry);
+  }
+
   Future<void> deleteEntry(String id) async {
     await _box.delete(id);
   }
