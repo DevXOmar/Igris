@@ -20,6 +20,17 @@ Future<String> saveBackupFile(String jsonContent, String fileName) async {
   }
 
   final baseName = _stripTrailingJsonExtensions(fileName);
+
+  if (Platform.isAndroid) {
+    final destDir = Directory('/storage/emulated/0/Download');
+    if (!await destDir.exists()) {
+      await destDir.create(recursive: true);
+    }
+    final file = File('${destDir.path}/$baseName.json');
+    await file.writeAsString(jsonContent);
+    return file.path;
+  }
+
   final bytes = Uint8List.fromList(utf8.encode(jsonContent));
 
   final savedTo = await FileSaver.instance.saveFile(
@@ -35,14 +46,6 @@ Future<String> saveBackupFile(String jsonContent, String fileName) async {
     throw Exception('Unable to save backup file to user storage.');
   }
 
-  if (Platform.isAndroid) {
-    // `file_saver` may return a content:// URI. The file is still stored in the
-    // public Downloads collection, so return a consistent, user-visible path.
-    if (normalized.startsWith('content://') || !normalized.contains('/')) {
-      return '/storage/emulated/0/Download/$baseName.json';
-    }
-  }
-
   return normalized;
 }
 
@@ -50,10 +53,17 @@ Future<void> openBackupLocation(String savedTo) async {
   final v = savedTo.trim();
   if (v.isEmpty) return;
 
-  // On Android, exports should land in the public Downloads collection.
-  // Most file explorers can open this directory directly.
+  // On Android, open the folder location in the file manager
   if (Platform.isAndroid) {
-    await OpenFilex.open('/storage/emulated/0/Download');
+    try {
+      final dir = File(v).parent.path;
+      final res = await OpenFilex.open(dir);
+      if (res.type != ResultType.done) {
+        await OpenFilex.open('/storage/emulated/0/Download');
+      }
+    } catch (_) {
+      await OpenFilex.open('/storage/emulated/0/Download');
+    }
     return;
   }
 
@@ -73,8 +83,8 @@ Future<void> openBackupLocation(String savedTo) async {
 
 String _stripTrailingJsonExtensions(String fileName) {
   final trimmed = fileName.trim();
-  // Remove one or more trailing ".json" segments to prevent ".json.json".
-  return trimmed.replaceAll(RegExp(r'(\\.json)+\\z', caseSensitive: false), '');
+  // Remove ALL trailing .json extensions
+  return trimmed.replaceAll(RegExp(r'(\.json)+$', caseSensitive: false), '');
 }
 
 Future<String> _saveBackupFileToAppDocuments(String jsonContent, String fileName) async {

@@ -14,6 +14,7 @@ import '../models/fuel_vault_entry.dart';
 import '../models/player_profile.dart';
 import '../models/rival.dart';
 import '../models/task.dart';
+import '../providers/progression_provider.dart' show recalculateProfileFromHistory;
 import '../core/utils/date_utils.dart' as app_date_utils;
 import 'domain_progress_service.dart';
 import 'streak_calculator.dart';
@@ -318,9 +319,11 @@ class BackupService {
         .toList();
 
     final profileJson = restoredData['playerProfile'];
-    final profile = (profileJson is Map)
+    final parsedProfile = (profileJson is Map)
         ? PlayerProfile.fromJson(Map<String, dynamic>.from(profileJson))
         : const PlayerProfile();
+
+    final profile = recalculateProfileFromHistory(parsedProfile);
 
     final fuelVaultEntries = <FuelVaultEntry>[];
     for (final raw in (restoredData['fuelVault'] as List)) {

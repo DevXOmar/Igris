@@ -6,6 +6,7 @@ import '../../core/theme/design_system.dart';
 import '../../core/theme/igris_animations.dart';
 import '../../providers/domain_provider.dart';
 import '../../providers/task_provider.dart';
+import '../../providers/daily_log_provider.dart';
 import '../../models/domain.dart';
 import '../../models/task.dart';
 import '../../core/utils/domain_stat_weights.dart';
@@ -163,6 +164,7 @@ class DomainsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final domainState = ref.watch(domainProvider);
     final taskState = ref.watch(taskProvider);
+    ref.watch(dailyLogProvider); // Listen to daily log updates to refresh task visibility
 
     return IgrisScreenScaffold(
       title: 'Domains',
@@ -210,7 +212,13 @@ class DomainsScreen extends ConsumerWidget {
               itemCount: domainState.domains.length,
               itemBuilder: (context, index) {
                 final domain = domainState.domains[index];
-                final domainTasks = taskState.getTasksByDomain(domain.id);
+                
+                // Get all tasks for domain, but hide completed one-time tasks
+                final logNotifier = ref.read(dailyLogProvider.notifier);
+                final domainTasks = taskState.getTasksByDomain(domain.id)
+                    .where((t) => t.isRecurring || !logNotifier.isTaskCompletedAnyTime(t.id))
+                    .toList();
+                
                 final weeklyScore = (domain.strength / 100.0).clamp(0.0, 1.0);
                 final shouldGlow = weeklyScore >= 0.90;
                 

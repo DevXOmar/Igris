@@ -687,6 +687,85 @@ double getEarlyGameXpMultiplier(int level) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// RECALCULATION HELPER FOR BACKUPS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Completely rebuilds the level, currentXP, totalXP, and unspentStatPoints
+/// purely from the historical counters in the given [profile].
+///
+/// Ensures backward compatibility with backups from earlier versions where
+/// leveling or point allocation curves might have differed.
+PlayerProfile recalculateProfileFromHistory(PlayerProfile profile) {
+  int level = 1;
+  int currentXP = 0;
+  int totalXP = 0;
+  int unspentStatPoints = 0;
+
+  int requiredXPForLevel(int lvl) => (100 * pow(lvl, 1.5)).floor();
+
+  void simulateAddXP(int baseAmount) {
+    final earlyMult = getEarlyGameXpMultiplier(level);
+    final scaledAmount = (baseAmount * earlyMult).round();
+    
+    currentXP += scaledAmount;
+    totalXP += scaledAmount;
+    
+    while (currentXP >= requiredXPForLevel(level)) {
+      currentXP -= requiredXPForLevel(level);
+      level++;
+      unspentStatPoints += getAllocationPointsForLevel(level);
+    }
+  }
+
+  // 1. Task XP
+  for (int i = 0; i < profile.totalTasksCompleted; i++) {
+    simulateAddXP(XpRewards.taskComplete);
+  }
+  
+  // 2. Weekly Goals XP
+  for (int i = 0; i < profile.weeklyGoalsCompleted; i++) {
+    simulateAddXP(XpRewards.weeklyGoal);
+    simulateAddXP(XpRewards.weeklyPerfectBonus);
+  }
+  
+  // 3. Streak Milestones XP
+  final milestoneXpMap = {
+    7: XpRewards.streak7,
+    14: XpRewards.streak14,
+    21: XpRewards.streak21,
+    30: XpRewards.streak30,
+    45: XpRewards.streak45,
+    60: XpRewards.streak60,
+  };
+  final sortedMilestones = profile.achievedStreakMilestones.toList()..sort();
+  for (final m in sortedMilestones) {
+    if (milestoneXpMap.containsKey(m)) {
+      simulateAddXP(milestoneXpMap[m]!);
+    }
+  }
+  
+  // Note: we can't fully reproduce 'firstTaskOfDayBonus' without iterating DailyLogs,
+  // but if the profile already holds total tasks, we might just boost the rest from the original totalXP 
+  // if they earned more than we simulated natively.
+  // Actually, we can just bump totalXP to whichever is higher.
+  if (profile.totalXP > totalXP) {
+    while (totalXP < profile.totalXP) {
+      simulateAddXP(1); // incrementally simulate the missing gap
+    }
+  }
+  
+  int spentPoints = profile.statAllocations.values.fold(0, (a, b) => a + b);
+  unspentStatPoints = max(0, unspentStatPoints - spentPoints);
+  
+  return profile.copyWith(
+    level: level,
+    currentXP: currentXP,
+    totalXP: totalXP,
+    unspentStatPoints: unspentStatPoints,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RANK HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 

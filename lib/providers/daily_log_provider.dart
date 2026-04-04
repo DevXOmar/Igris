@@ -42,6 +42,12 @@ class DailyLogState {
 /// 3. Reload today's log -> UI rebuilds
 class DailyLogNotifier extends Notifier<DailyLogState> {
   final DailyLogService _service = DailyLogService();
+
+  /// Check if a task was completed on ANY day.
+  /// Useful for hiding completed one-time tasks.
+  bool isTaskCompletedAnyTime(String taskId) {
+    return _service.getAllLogs().any((log) => log.isTaskCompleted(taskId));
+  }
   
   @override
   DailyLogState build() {
