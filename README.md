@@ -207,7 +207,11 @@ IGRIS.
 - Versioning & Release: runtime app version read from platform metadata instead of a hardcoded value.
 - Onboarding & Cinematic Boot: added a cinematic first-launch name flow and `SystemBootScreen` (prewarm + one-frame delay to avoid flicker and smooth transitions).
 - Backup & Restore (Schema v2): complete overhaul — export/import as portable JSON, migration paths, preview/confirm UX, atomic restore with rollback, and Fuel Vault images embedded as base64 so restores are device-portable.
-- Backup export UX: exports now save to user-visible storage (Downloads/save dialog) and Settings shows the saved location with an `OPEN` action to reveal the file in the system file UI when available.
+ - Backup & Restore (Schema v2): complete overhaul — export/import as portable JSON, migration paths, preview/confirm UX, atomic restore with rollback, and Fuel Vault images embedded as base64 so restores are device-portable.
+ - Backup export UX: exports now save to user-visible storage (Downloads/save dialog) and Settings shows the saved location with an `OPEN` action to reveal the file in the system file UI when available.
+	 - NOTE: fixed filename duplication — backups are now saved with a single `.json` extension (no more `.json.json`).
+	 - On Android exports are written to the public `Downloads` folder (`/storage/emulated/0/Download/`) for easier access.
+	 - The Settings `OPEN` action reveals the containing folder in the system file manager; if opening the exact file fails, it falls back to opening the `Downloads` folder.
 - Domain progress & Stats refactor: switched to allocation-only storage and pure derived stats via `DomainProgressService` (expected-so-far vs completed-so-far weekly progress) — fixes weekly progress semantics and improves testability.
 - Tasks & Scheduling: `Task` model extended with scheduling metadata (`activeDays`, `createdAt`, `scheduledFor`) to support recurring and one-off schedules.
 - XP & Streaks: XP rebalance, streak milestones, and title unlocks added; persisted and migrated across schema changes.
